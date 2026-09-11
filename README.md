@@ -7,16 +7,20 @@ Draw a rough rectangle, lasso it, tap **Patterns**, and choose the spacing in
 millimetres, how big the marks are and how dark. Or place one from the sidebar
 on an empty page.
 
-> **Status: early.** The geometry is unit-tested and the SDK groundwork is
-> inherited from [Tables](https://github.com/Sparkinman/tables-supernote-plugin),
-> which is tested on both panels. This plugin has had one run on an A6X2: it
-> draws, and the mark sizes have been corrected once as a result.
+> **Status: working, tested on hardware.** 34 unit tests, plus an on-device
+> probe suite that has been run repeatedly on an A6X2 (Nomad). Every mark
+> lands, the drawing time on screen is accurate to within half a second, and
+> the mark sizes and tones are what a photographed ladder says the panel can
+> actually tell apart.
+
+**[Download Patterns.snplg](../../releases/latest)** → copy it to the device →
+**Settings → Apps → Plugins → Add Plugin**.
 
 ## What it does
 
 - **Four patterns** — dots, crosses, ruled lines for writing on, or squares.
 - **Spacing in millimetres**, from 2.5mm to 20mm. 5mm is what dot grid paper
-  uses.
+  uses; 8mm suits writing.
 - **Three mark sizes** and **two tones** — black or grey. For a lighter grid
   still, grey at the fine size.
 - **No border.** The pattern fills the region and stops; it does not draw a
@@ -49,8 +53,9 @@ better of the two anyway.
 - Re-edit a pattern you have already drawn. A pattern is drawn once; to change
   the spacing, erase it and draw it again. (Its own layer makes that safe.)
 - Rotated or non-rectangular regions.
-- Anything above a few thousand marks in one go — it refuses and says how many
-  you asked for rather than drawing half of it.
+- Anything that would take more than a minute to draw. Every mark is a
+  separate element and the device spends about 38ms on each, so it refuses and
+  tells you how long it would have been rather than drawing half of it.
 
 ## Building it
 

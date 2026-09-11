@@ -129,7 +129,7 @@ export type MarkSize = keyof typeof MARK_SIZES;
 export const MARK_SIZE_ORDER: MarkSize[] = ['fine', 'medium', 'bold'];
 
 /** Spacings offered, in millimetres. 5mm is what dot grid paper uses. */
-export const SPACINGS_MM = [2.5, 3, 4, 5, 6, 7.5, 10, 12.5, 15, 20] as const;
+export const SPACINGS_MM = [2.5, 3, 4, 5, 6, 7.5, 8, 10, 12.5, 15, 20] as const;
 
 export const DEFAULT_SPACING_MM = 5;
 

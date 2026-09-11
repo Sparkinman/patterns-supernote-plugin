@@ -11,12 +11,21 @@ What was dropped in the fork: table detection, the diff, the mutation layer and
 everything that existed because a table had to be recognised again after the
 note was closed. A pattern is drawn once and never read back.
 
-Current build **0.5.0** (versionCode 5), a **diagnostics build**:
-`DIAGNOSTICS = true` in `src/flags.ts` and `add(DiagnosticsLogPackage())`
-uncommented in `MainApplication.kt`, writing `Document/Patterns/log.txt`, with a
-**Probes** button in the panel header. **34 tests**; `tsc` and `eslint` clean.
+Current build **1.0.0** (versionCode 6) — the **first public release**. A few
+hundred KB of pure JavaScript, no native code, **no log and no probe suite**:
+`DIAGNOSTICS` is false in `src/flags.ts` and `add(DiagnosticsLogPackage())` is
+commented out in `MainApplication.kt`. Nothing is written to
+`Document/Patterns/` and the Probes button does not exist.
 
-Run on a Nomad once: it draws, and the two faults found were both about the ends of the size and tone ranges. See below.
+The probe source is still here, behind the flag, because it is where every
+measured fact in this file came from and the next question will need it. Two
+edits turn it back on; both are needed, and the second is also what the build
+script scans to decide there is native code at all. **34 tests**; `tsc` and
+`eslint` clean.
+
+Run repeatedly on a Nomad. Every mark lands at every size tried, the drawing
+estimate on screen is accurate to within half a second, and the sizes and tones
+are what a photographed ladder says the panel can distinguish.
 
 ## What is different from Tables
 

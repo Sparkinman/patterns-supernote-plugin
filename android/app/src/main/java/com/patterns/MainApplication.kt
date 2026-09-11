@@ -28,7 +28,7 @@ class MainApplication : Application(), ReactApplication {
               // To debug on a device, uncomment this and set DIAGNOSTICS in
               // src/flags.ts back to true. Both are needed: the flag alone
               // has nothing to write with.
-              add(DiagnosticsLogPackage())
+              // add(DiagnosticsLogPackage())
               // Packages that cannot be autolinked yet can be added manually here, for example:
               // add(MyReactNativePackage())
             }

@@ -14,4 +14,4 @@
  * JavaScript — which is also why the release package is a few hundred
  * kilobytes rather than seven megabytes.
  */
-export const DIAGNOSTICS = true;
+export const DIAGNOSTICS = false;
