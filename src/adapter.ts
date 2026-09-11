@@ -155,15 +155,18 @@ export type InsertRoute = 'batch' | 'one-at-a-time' | 'failed';
  * measured the whole operation at 42ms a mark — which is bridge latency, not
  * drawing.
  *
- * So they are allocated in chunks, with the chunk in flight together. Chunked
- * rather than all at once deliberately: `createElement` allocates natively and
- * registers accessors behind the element's uuid, and firing a thousand of
- * those simultaneously at a module whose re-entrancy nobody has tested is a
- * worse idea than firing sixteen. Probe 7 times 1, 16 and 64 against each
- * other and counts what lands each time, which is what this number should be
- * set from.
+ * So they are allocated in chunks, with the chunk in flight together.
+ *
+ * **Measured, and it is worth far less than it looks.** Probe 7 raced 1, 16
+ * and 64 over the same 48 marks: 192ms, 80ms and 57ms to build, every mark
+ * landing every time. Three and a half times faster — and six per cent of the
+ * job, because the build was never where the time was. See `insertLines`.
+ *
+ * 64 because it is measured and nothing was dropped at it. `createElement`
+ * allocates natively and registers accessors behind the element's uuid, so
+ * there was a real question about re-entrancy; the answer is that it copes.
  */
-export const BUILD_CONCURRENCY = 16;
+export const BUILD_CONCURRENCY = 64;
 
 /**
  * Turn lines into elements the host will accept, several at a time.
@@ -203,9 +206,19 @@ export async function insertLines(
   try {
     /*
      * Timed in two halves, because they are two different costs and only one
-     * of them is the device drawing anything. Allocating the elements is
-     * bridge latency; the insert is the host doing the work. Until probe 7
-     * split them nobody knew which was the 42ms.
+     * of them is ours.
+     *
+     * **The insert is the whole of it, and there is nothing on this side of
+     * the bridge that will make it quicker.** Measured on an A6X2: 48 marks
+     * took 1,912ms to insert, 120 took 4,533 and 460 took 16,941 — 40, 38 and
+     * 37ms an element, flat, in a single `insertPageElements` call. Building
+     * those same elements takes 1.2ms each. Concurrency was worth 3.4x on the
+     * build and 6% on the job.
+     *
+     * The only real lever left is **fewer elements for the same picture**,
+     * which is why `lines` and `squares` exist and why the count and the
+     * estimate are on the screen before anybody presses Draw it: a 5mm grid
+     * over a page is 560 dots or 44 rules, and they cover the same paper.
      */
     const startedBuild = Date.now();
     const elements = await buildElements(lines, page);

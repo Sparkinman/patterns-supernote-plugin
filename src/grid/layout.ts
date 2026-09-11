@@ -26,12 +26,18 @@ import type {GridSpec, Pt, RectPx, RenderedLine} from './types';
 /**
  * How long one mark takes to draw, in milliseconds.
  *
- * Measured on an A6X2, in one batch call: 120 marks in 5,697ms and 460 in
- * 18,935ms. That is 47ms and 41ms each, so the cost is per element and very
- * nearly linear — the batch is not doing anything clever, and there is nothing
- * to optimise from this side.
+ * Measured on an A6X2, and re-measured once the elements were being built
+ * concurrently: 48 marks in 1,969ms, 120 in 4,759 and 460 in 17,312. Flat at
+ * about 38ms, and **almost all of it is inside the host's own insert** — 37ms
+ * an element there against 1.2ms to build one. Concurrency on the build side
+ * bought 6% of the job and there is nothing else on this side of the bridge to
+ * win.
+ *
+ * Which makes the only real lever *fewer elements for the same picture*. A 5mm
+ * grid over a page is 560 dots or 44 ruled lines, and they cover the same
+ * paper: twenty-one seconds against two.
  */
-export const MS_PER_MARK = 42;
+export const MS_PER_MARK = 38;
 
 /**
  * The longest anybody should be asked to watch a panel not respond.

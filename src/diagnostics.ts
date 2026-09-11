@@ -833,6 +833,85 @@ const gridDraw: Probe = {
   },
 };
 
+/**
+ * How many greys does this firmware actually have?
+ *
+ * `Element.ts` carries a comment saying `0x00=black, 0x9D=dark gray,
+ * 0xC9=light gray, 0xFE=white`, and this project has treated that as the
+ * palette ever since. **It is a comment, not a rule.** `GeometrySchema`
+ * validates `penColor` as `{type: 'number', integer: true}` and nothing more —
+ * no enum, no range. Nobody has ever tried a value that is not one of the four.
+ *
+ * That matters because the lightest of them is too light to be useful: a grid
+ * you cannot see is not a faint grid. If the firmware renders intermediate
+ * greys there is a proper ramp to be had. If it snaps to the nearest of four,
+ * the read-back values will say so outright and the tones stop at three.
+ *
+ * Photograph it. The log says what was stored; only the page says what is
+ * visible.
+ */
+const toneLadder: Probe = {
+  id: 'tones',
+  title: '9. How many greys are there really',
+  writes: true,
+  async run() {
+    section('9. Tone ladder');
+    const ctx = await context();
+    if (noNoteOpen(ctx)) {
+      return;
+    }
+    await save(ctx);
+    const r = regions(ctx.pageSize).ladder;
+
+    const tones = [0x00, 0x30, 0x50, 0x70, 0x9d, 0xb0, 0xc9, 0xe0];
+    const spacing = Math.round((r.bottom - r.top) / (tones.length + 1));
+    log(`drawing ${tones.length} lines, top to bottom, at penColor: ${tones.map(t => '0x' + t.toString(16)).join(', ')}`);
+    log('0x00, 0x9d, 0xc9 and 0xfe are the four the comment in Element.ts names.');
+    log('The rest are between them, and have never been tried.');
+
+    const before = lineSegs(await readElements(ctx)).map(seg => seg.numInPage);
+    json(
+      'insert route',
+      await insertLines(
+        tones.map((penColor, i) => ({
+          p1: {x: r.left, y: r.top + spacing * (i + 1)},
+          p2: {x: r.right, y: r.top + spacing * (i + 1)},
+          penWidth: penWidthForPx(MARK_SIZES.bold),
+          penColor,
+          penType: PEN_TYPE.fineliner,
+        })),
+        ctx.page,
+        null,
+      ),
+    );
+    await commitAndRepaint(ctx.filePath);
+    await save(ctx);
+
+    const known = new Set(before);
+    const mine = lineSegs(await readElements(ctx))
+      .filter(seg => !known.has(seg.numInPage))
+      .sort((a, b) => a.p1.y - b.p1.y);
+    json(
+      'penColor as sent, and as read back',
+      mine.map((seg, i) => ({
+        sent: '0x' + (tones[i] ?? 0).toString(16),
+        read: '0x' + seg.penColor.toString(16),
+      })),
+    );
+
+    const kept = mine.filter((seg, i) => seg.penColor === tones[i]).length;
+    result(
+      'the firmware stores the grey it was given',
+      kept === tones.length ? 'PASS' : 'INFO',
+      kept === tones.length
+        ? 'every value round-tripped — so there are more than four greys to store, whatever it draws'
+        : `${kept} of ${tones.length} round-tripped — the rest were snapped, so the palette really is fixed`,
+    );
+    log('PHOTOGRAPH THE PAGE NOW. A stored value is not the same as a visible one:');
+    log('count how many distinct greys you can actually see, not how many came back.');
+  },
+};
+
 const lasso: Probe = {
   id: 'lasso',
   title: '10. Lasso (select something first)',
@@ -954,6 +1033,7 @@ export const PROBES: Probe[] = [
   numbering,
   layers,
   gridDraw,
+  toneLadder,
   lasso,
   cleanup,
 ];
@@ -965,7 +1045,7 @@ export const PROBES: Probe[] = [
  * anything once the note has actually been closed and reopened, and step 11
  * would erase the pen ladder before it could be photographed.
  */
-export const FIRST_PASS = ['env', 'census', 'insert', 'pen', 'nums', 'layers', 'grid', 'geom'];
+export const FIRST_PASS = ['env', 'census', 'insert', 'pen', 'tones', 'nums', 'layers', 'grid', 'geom'];
 
 /** Run one probe, never letting it throw into the UI. */
 export async function runProbe(probe: Probe): Promise<void> {

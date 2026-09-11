@@ -5,8 +5,8 @@
   "author": "Sparkinman",
   "iconPath": "assets/icon.png",
   "desc": "Fill a box you have drawn with a pattern: a dot grid, crosses, ruled lines for writing, or squares. Draw a rough rectangle, lasso it, then choose the spacing in millimetres, how big the marks are and how dark. The pattern is drawn on a layer of its own where the device allows it, so erasing your writing cannot rub it out. File read and write access is used only for the note you are working in. Nothing is sent anywhere - the plugin has no network access at all.",
-  "versionCode": "3",
-  "versionName": "0.3.0",
+  "versionCode": "4",
+  "versionName": "0.4.0",
   "jsMainPath": "index",
   "uses-permissions": [
     "plugin.permission.FILE:READ",

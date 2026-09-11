@@ -11,7 +11,7 @@ What was dropped in the fork: table detection, the diff, the mutation layer and
 everything that existed because a table had to be recognised again after the
 note was closed. A pattern is drawn once and never read back.
 
-Current build **0.3.0** (versionCode 3), a **diagnostics build**:
+Current build **0.4.0** (versionCode 4), a **diagnostics build**:
 `DIAGNOSTICS = true` in `src/flags.ts` and `add(DiagnosticsLogPackage())`
 uncommented in `MainApplication.kt`, writing `Document/Patterns/log.txt`, with a
 **Probes** button in the panel header. **34 tests**; `tsc` and `eslint` clean.
@@ -29,6 +29,52 @@ Run on a Nomad once: it draws, and the two faults found were both about the ends
 | Squares | **Interior rules only.** Drawing a rule at every lattice position puts one along each edge, and four of those are a frame. Ruled paper has no frame. |
 | Lines | Horizontal rules only, and **all** of them, including the outermost. The opposite of squares, because horizontals alone cannot make a frame. |
 | `MAX_MARKS` | Derived from `MAX_DRAW_SECONDS` and the measured 42ms a mark. Nothing is dropped at any size tried; the limit is how long somebody will watch a panel that appears to be doing nothing. |
+
+## The insert is the whole cost, and concurrency is worth 6% — 0.4.0
+
+Probe 7 raced the element build at 1, 16 and 64 over the same 48 marks. Every
+mark landed every time, so `createElement` is re-entrant and `BUILD_CONCURRENCY`
+is 64 now. It bought almost nothing:
+
+| concurrency | build | insert |
+|---|---|---|
+| 1 | 192ms | 1,912ms |
+| 16 | 80ms | 1,927ms |
+| 64 | 57ms | 1,980ms |
+
+**The insert does not move.** 40ms an element at 48 marks, 38 at 120, 37 at
+460 — flat, inside a single `insertPageElements`, and nothing this side of the
+bridge touches it. Building an element costs 1.2ms against the 37ms the host
+spends drawing it. Three and a half times faster on 2–9% of the job is 6%.
+
+So **the only lever left is fewer elements for the same picture**. A 5mm grid
+over a page is 560 dots or 44 ruled lines and they cover the same paper —
+twenty-one seconds against two. The choose screen now says what squares would
+cost whenever dots or crosses would take more than eight seconds, because that
+is the moment somebody can act on it.
+
+`MS_PER_MARK` is 38, re-measured with the concurrent build.
+
+## `penColor` is not a palette of four — untested since day one
+
+`Element.ts` carries a comment: `0x00=black, 0x9D=dark gray, 0xC9=light gray,
+0xFE=white`. This project has treated that as the set of colours the firmware
+accepts since the first device run, and it is **a comment, not a rule**.
+`GeometrySchema` validates `penColor` as `{type: 'number', integer: true}` and
+nothing else — no enum, no range. **No value outside those four has ever been
+tried.**
+
+It surfaced because `faint` (0xc9) is too faint to be useful — a grid you
+cannot see is not a faint grid — and the next tone up, 0x9d, is a long way
+darker. If there is anything between them the tones are a proper ramp; if the
+firmware snaps to the nearest of four, there are three and one of them is
+unusable, and the control should say so.
+
+Probe 9 draws eight lines at 0x00, 0x30, 0x50, 0x70, 0x9d, 0xb0, 0xc9 and
+0xe0 and reports what each one reads back as. **A stored value is not a
+visible one**: if they all round-trip that only proves the field holds them,
+and the photograph is what says how many greys the panel actually renders.
+Nothing about the tones changes until that has been looked at.
 
 ## Probe 7, and the two things it settled — 0.3.0
 

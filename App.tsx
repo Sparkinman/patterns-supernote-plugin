@@ -517,6 +517,27 @@ function Choose({screen: chosen, h}: {screen: Extract<Screen, {kind: 'choose'}>;
   const spec = specOf(chosen);
   const fit = fitGrid(spec);
   const marks = markCount(spec);
+
+  /*
+   * What the cheap patterns would cost, when the expensive one is slow.
+   *
+   * The drawing time is 38ms an element and essentially all of it is inside
+   * the host's own insert — measured, and not something this side of the
+   * bridge can improve. So the only lever anybody has is fewer elements for
+   * the same paper, and a 5mm grid over a page is 560 dots or 44 ruled lines.
+   * Worth saying out loud at the point the choice is being made, rather than
+   * leaving somebody to wait twenty seconds and work it out.
+   */
+  const cheaper = (() => {
+    if (chosen.style.pattern === 'squares' || chosen.style.pattern === 'lines') {
+      return null;
+    }
+    const asSquares = markCount({...spec, style: {...spec.style, pattern: 'squares'}});
+    if (asSquares < 1 || estimateSeconds(marks) < 8 || asSquares * 4 > marks) {
+      return null;
+    }
+    return {marks: asSquares, seconds: estimateSeconds(asSquares)};
+  })();
   const index = SPACINGS_MM.indexOf(chosen.spacingMm as (typeof SPACINGS_MM)[number]);
   const step = (by: number) => {
     const next = SPACINGS_MM[Math.min(SPACINGS_MM.length - 1, Math.max(0, index + by))];
@@ -534,6 +555,11 @@ function Choose({screen: chosen, h}: {screen: Extract<Screen, {kind: 'choose'}>;
         {`${Math.round(rectWidth(chosen.rect))} × ${Math.round(rectHeight(chosen.rect))} px, about ${marks.toLocaleString()} mark${marks === 1 ? '' : 's'}` +
           (fit.ok ? `, ${estimateSeconds(marks)} seconds to draw.` : '.')}
       </Text>
+      {cheaper !== null && (
+        <Text style={styles.note}>
+          {`Squares over the same area would be ${cheaper.marks} mark${cheaper.marks === 1 ? '' : 's'} and about ${cheaper.seconds} second${cheaper.seconds === 1 ? '' : 's'}.`}
+        </Text>
+      )}
       {!!chosen.note && <Text style={styles.pending}>{chosen.note}</Text>}
       {fit.ok === false && !chosen.note && <Text style={styles.pending}>{fit.reason}</Text>}
 

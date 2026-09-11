@@ -349,8 +349,10 @@ describe('the cap is a time budget, not a failure threshold', () => {
    * to be doing nothing.
    */
   it('matches what was measured on the panel', () => {
+    // 120 marks in 4,759ms and 460 in 17,312, with the elements built
+    // concurrently. Flat at about 38ms, almost all of it the host's insert.
     expect(estimateSeconds(120)).toBe(5);
-    expect(estimateSeconds(460)).toBe(19);
+    expect(estimateSeconds(460)).toBe(17);
   });
 
   it('refuses at about a minute, not at three minutes', () => {
