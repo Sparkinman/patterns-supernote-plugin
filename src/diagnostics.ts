@@ -891,21 +891,41 @@ const toneLadder: Probe = {
     const mine = lineSegs(await readElements(ctx))
       .filter(seg => !known.has(seg.numInPage))
       .sort((a, b) => a.p1.y - b.p1.y);
+    /*
+     * Matched by position on the page, not by index into the list. When only
+     * three of eight land, the third element that arrived is not the third
+     * value that was sent, and pairing them up by index invents a mapping.
+     * The y a line was asked for is the only honest key.
+     */
+    const sentAt = new Map(tones.map((t, i) => [r.top + spacing * (i + 1), t]));
     json(
       'penColor as sent, and as read back',
-      mine.map((seg, i) => ({
-        sent: '0x' + (tones[i] ?? 0).toString(16),
-        read: '0x' + seg.penColor.toString(16),
-      })),
+      mine.map(seg => {
+        const y = [...sentAt.keys()].reduce((best, k) =>
+          Math.abs(k - seg.p1.y) < Math.abs(best - seg.p1.y) ? k : best,
+        );
+        return {
+          y: Math.round(seg.p1.y),
+          sent: '0x' + (sentAt.get(y) ?? 0).toString(16),
+          read: '0x' + seg.penColor.toString(16),
+          honoured: sentAt.get(y) === seg.penColor,
+        };
+      }),
     );
+    log(`${mine.length} of ${tones.length} landed at all — the rest were refused outright.`);
 
-    const kept = mine.filter((seg, i) => seg.penColor === tones[i]).length;
+    const kept = mine.filter(seg => {
+      const y = [...sentAt.keys()].reduce((best, k) =>
+        Math.abs(k - seg.p1.y) < Math.abs(best - seg.p1.y) ? k : best,
+      );
+      return sentAt.get(y) === seg.penColor;
+    }).length;
     result(
       'the firmware stores the grey it was given',
       kept === tones.length ? 'PASS' : 'INFO',
       kept === tones.length
         ? 'every value round-tripped — so there are more than four greys to store, whatever it draws'
-        : `${kept} of ${tones.length} round-tripped — the rest were snapped, so the palette really is fixed`,
+        : `${kept} of ${tones.length} kept the value they were sent. Anything that landed with a different penColor was SNAPPED without a word.`,
     );
     log('PHOTOGRAPH THE PAGE NOW. A stored value is not the same as a visible one:');
     log('count how many distinct greys you can actually see, not how many came back.');

@@ -137,28 +137,32 @@ export const DEFAULT_SPACING_MM = 5;
  * How dark the marks are drawn.
  *
  * There is no opacity in this SDK. `Geometry` has a `penColor` and nothing
- * else — no alpha, no blend — and the panel has one ink. What it does have is
- * three greys the firmware will accept, and on an e-ink screen a grey dot
- * reads as a faint one, which is the thing being asked for.
+ * else — no alpha, no blend — and the panel has one ink. So these are tones,
+ * not transparency, and the difference matters in one place: a grey dot is
+ * grey against the paper *and* against anything written over it, because it is
+ * ink rather than a filter. For a grid you write on top of that is the right
+ * way round.
  *
- * So these are tones, not transparency, and the difference matters in one
- * place: a light grey dot is light against the paper *and* against anything
- * written over it, because it is ink rather than a filter. For a dot grid that
- * is exactly right — faint marks you write straight over.
+ * **Two, not three, and the third was cut on the evidence.** The firmware
+ * takes exactly four values — 0x00, 0x9d, 0xc9 and white — which probe 9
+ * settled: the batch route refuses anything else with 302, "Invalid color
+ * value", and the `insertGeometry` fallback silently snaps it to the nearest
+ * one instead. There is nothing between them to reach for.
  *
- * The values are fixed by the firmware. `GeometrySchema` rejects anything that
- * is not one of these four, and white is not useful here.
+ * 0xc9 was offered as `faint` and is simply too light to be useful: a grid you
+ * cannot see is not a faint grid, it is a missing one. Offering it was
+ * offering a setting that does not work. A light grid is now grey at the fine
+ * size, which lays down less ink than 0xc9 at bold did anyway.
  */
 export const TONES = {
   black: PEN_COLOR.black,
   grey: PEN_COLOR.darkGrey,
-  faint: PEN_COLOR.lightGrey,
 } as const;
 
 export type Tone = keyof typeof TONES;
 
 /** In the order they are offered, darkest first. */
-export const TONE_ORDER: Tone[] = ['black', 'grey', 'faint'];
+export const TONE_ORDER: Tone[] = ['black', 'grey'];
 
 export interface GridStyle {
   /** One of TONES. */

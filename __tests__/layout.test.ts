@@ -207,13 +207,20 @@ describe('the three patterns', () => {
 });
 
 describe('how dark the marks are', () => {
-  it('offers three tones the firmware will actually accept', () => {
-    // GeometrySchema rejects any penColor that is not one of its four.
-    expect(Object.values(TONES)).toEqual([0x00, 0x9d, 0xc9]);
+  /*
+   * Two, and the third was cut on the evidence. Probe 9 sent eight greys: the
+   * batch route refused anything outside the firmware's four with 302,
+   * "Invalid color value", and the insertGeometry fallback silently snapped
+   * instead. So there is no grey between 0x9d and 0xc9 to reach for, and 0xc9
+   * is too light to be a grid rather than a missing one.
+   */
+  it('offers only the greys that are both accepted and useful', () => {
+    expect(Object.values(TONES)).toEqual([0x00, 0x9d]);
+    expect(Object.values(TONES)).not.toContain(0xc9);
   });
 
   it('draws every mark in the tone that was asked for', () => {
-    for (const tone of [TONES.black, TONES.grey, TONES.faint]) {
+    for (const tone of [TONES.black, TONES.grey]) {
       const marks = layoutGrid(spec({left: 0, top: 0, right: 100, bottom: 100}, 25, {penColor: tone}));
 
       expect(marks.every(m => m.penColor === tone)).toBe(true);

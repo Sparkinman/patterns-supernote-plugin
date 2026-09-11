@@ -11,7 +11,7 @@ What was dropped in the fork: table detection, the diff, the mutation layer and
 everything that existed because a table had to be recognised again after the
 note was closed. A pattern is drawn once and never read back.
 
-Current build **0.4.0** (versionCode 4), a **diagnostics build**:
+Current build **0.5.0** (versionCode 5), a **diagnostics build**:
 `DIAGNOSTICS = true` in `src/flags.ts` and `add(DiagnosticsLogPackage())`
 uncommented in `MainApplication.kt`, writing `Document/Patterns/log.txt`, with a
 **Probes** button in the panel header. **34 tests**; `tsc` and `eslint` clean.
@@ -24,7 +24,7 @@ Run on a Nomad once: it draws, and the two faults found were both about the ends
 |---|---|
 | `src/grid/layout.ts` | A rectangle and a spacing become marks. Pure, and the only interesting module. |
 | A dot | A stroke one pixel long. The cap paints half the pen width past each end, so a stub at `penWidth` N is a round blob N/100 px across. No circle primitive, no fill. |
-| Tone | `penColor`, not opacity. There is no alpha in this SDK; the three tones are the three greys `GeometrySchema` accepts. A faint mark is light ink. |
+| Tone | `penColor`, not opacity. There is no alpha in this SDK. Two tones: 0x00 and 0x9d. The firmware also takes 0xc9, and it is too light to be worth offering. |
 | Spacing | Millimetres. Both panels are 300dpi in element space, so a millimetre is the same number of pixels on each. `src/grid/types.ts` is the one place that would have to learn about a panel that is not. |
 | Squares | **Interior rules only.** Drawing a rule at every lattice position puts one along each edge, and four of those are a frame. Ruled paper has no frame. |
 | Lines | Horizontal rules only, and **all** of them, including the outermost. The opposite of squares, because horizontals alone cannot make a frame. |
@@ -54,6 +54,33 @@ cost whenever dots or crosses would take more than eight seconds, because that
 is the moment somebody can act on it.
 
 `MS_PER_MARK` is 38, re-measured with the concurrent build.
+
+## `penColor` IS a palette of four, and the host enforces it — settled 0.5.0
+
+Probe 9 sent eight greys and the answer came back in two different ways, which
+is the interesting part.
+
+**The batch route refuses outright.** `insertPageElements` answered
+`{"code":302,"message":"Invalid color value. Cannot call the API."}` and
+rejected the whole call. So the four values in `Element.ts`'s comment are real
+after all — they are just not enforced by `GeometrySchema`, which validates
+`penColor` as a plain integer. **The JS schema is not the authority; the host
+is.**
+
+**The `insertGeometry` fallback does not refuse. It snaps, silently.** Sent
+0x30 it stored 0x9d; sent 0x50 it stored 0xc9; then it stopped drawing
+altogether. Three of eight landed and nothing said which had been altered.
+
+That second one is the dangerous one and it is now written down: **a route that
+accepts a value is not a route that honoured it.** The batch refusing is the
+better behaviour of the two.
+
+So there are three greys the firmware takes and **two the plugin offers**.
+0xc9 was `faint` and is simply too light to be useful — a grid you cannot see
+is not a faint grid, it is a missing one, and offering it was offering a
+setting that does not work. There is nothing between it and 0x9d to reach for,
+so it is gone. A light grid is grey at the fine size, which lays down less ink
+than 0xc9 at bold did anyway.
 
 ## `penColor` is not a palette of four — untested since day one
 
@@ -197,6 +224,8 @@ in `~/.claude/skills/supernote-plugin-dev/SKILL.md`.
 | `getDeviceType` answers **4** on an A6X2 (Nomad) and **5** on an A5X2 (Manta). | The device identifier. Nothing uses it yet, and the penWidth difference above is the first thing that might want to. |
 | **A table drawn on one panel opens in the right place on the other.** Drawn on a Manta, the note opened on a Nomad: every edge, and the handwriting beside it, at 1404/1920 of where it was. Measured off the two screenshots — 0.732, 0.729, 0.731 against an expected 0.7312. | The firmware scales the whole page between the file's 1920×2560 and the panel's display space, so nothing here has to. It also means `SAFE_MARGIN`, being in display pixels, is the same *physical* inset on both — which is what it is for. |
 | **The batch insert is reliable on a Manta and not on a Nomad.** Every `insertPageElements` on a Nomad reports success and draws nothing the first time (`1 -> 1 element(s)`, five times in one session, and again inside probe 7). Not once on a Manta, in any run. | The count-and-retry in `createTable`, `commitEdit` and probe 7 is not belt and braces — on one of the two panels it is the only reason anything gets drawn. Do not add a write path without it. |
+| **`penColor` really is a palette of four**, enforced by the host rather than by the SDK. `insertPageElements` answers **302, "Invalid color value"** and rejects the whole batch; `GeometrySchema` validates it as a plain integer and lets anything through. | The JS schema is not the authority. Only 0x00, 0x9d, 0xc9 and 0xfe may be sent. |
+| **`insertGeometry` snaps an out-of-range `penColor` instead of refusing it.** Sent 0x30 it stored 0x9d; sent 0x50 it stored 0xc9, and said nothing. | A route that accepts a value is not a route that honoured it. Read back anything that matters, and prefer the route that refuses. |
 | **`modifyLayers` puts the layer back in the file, not in the running note app.** The app keeps whatever layer it had selected until something makes it re-read. | The restore in `withTablesLayer` reloads afterwards. Without that it reported success — probe 6 reads the file back and passes — while the user was still on the Tables layer and their next stroke landed among the rules. |
 | **The first batch insert after the panel opens is often swallowed**, reporting success and drawing nothing: `1 -> 1 element(s)`, five times in one session, on blank pages and populated ones. A second attempt always lands. | Every path that writes has to check and retry — `createTable` does, `commitEdit`'s verification does, and probe 7 now does. Do not add a write path without one. |
 | **A blank page reports no elements** — page templates are not elements. | The detector does not have to exclude ruled paper. |

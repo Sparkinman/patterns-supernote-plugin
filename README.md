@@ -17,8 +17,8 @@ on an empty page.
 - **Four patterns** — dots, crosses, ruled lines for writing on, or squares.
 - **Spacing in millimetres**, from 2.5mm to 20mm. 5mm is what dot grid paper
   uses.
-- **Three mark sizes** and **three tones** — black, grey or faint. A faint grid
-  is the one you actually want to write over.
+- **Three mark sizes** and **two tones** — black or grey. For a lighter grid
+  still, grey at the fine size.
 - **No border.** The pattern fills the region and stops; it does not draw a
   frame around itself, and the rough box you drew is rubbed out once the
   pattern is in.
@@ -39,10 +39,10 @@ pixel long: the caps do the rest, and the result is a round blob whose diameter
 is just the pen width. One code path draws all three patterns.
 
 **And there is no transparency.** `Geometry` has a `penColor` and nothing else
-— no alpha, no blend — and the panel has one ink. The three tones are three
-greys the firmware accepts. A faint mark is light ink rather than a
-see-through one, which for a grid you write over is the better of the two
-anyway.
+— no alpha, no blend — and the panel has one ink. The firmware accepts exactly
+four values and the plugin offers the two that are useful. A grey mark is light
+ink rather than a see-through one, which for a grid you write over is the
+better of the two anyway.
 
 ## What it does not do
 

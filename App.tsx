@@ -115,7 +115,6 @@ const SIZE_LABEL: Record<MarkSize, string> = {
 const TONE_LABEL: Record<Tone, string> = {
   black: 'Black',
   grey: 'Grey',
-  faint: 'Faint',
 };
 
 const specOf = (screen: Extract<Screen, {kind: 'choose'}>): GridSpec => ({
@@ -601,9 +600,10 @@ function Choose({screen: chosen, h}: {screen: Extract<Screen, {kind: 'choose'}>;
         onChange={tone => setStyle({penColor: TONES[tone]})}
       />
       <Text style={styles.note}>
-        Faint marks are easiest to write over. There is no transparency on this
-        hardware — these are three greys the firmware accepts, so a faint mark
-        is light ink rather than a see-through one.
+        Grey is easiest to write over. There is no transparency on this
+        hardware — these are the two usable greys the firmware accepts, so a
+        grey mark is light ink rather than a see-through one. For a lighter
+        grid still, use grey at the fine size.
       </Text>
     </View>
   );
@@ -749,9 +749,7 @@ function GridPreview({spec, pageSize}: {spec: GridSpec; pageSize: Size}) {
   const tone =
     spec.style.penColor === TONES.black
       ? '#000000'
-      : spec.style.penColor === TONES.grey
-        ? '#6b6b6b'
-        : '#b4b4b4';
+      : '#6b6b6b';
 
   /*
    * The mark size, exaggerated on purpose.
