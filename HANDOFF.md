@@ -1,7 +1,8 @@
 # Patterns — state as of 2026-09-11
 
-A Supernote plugin that fills a box you have drawn with a dot grid, crosses or
-ruled squares. **`pluginID 5urw59jo9zji8rbh`** — never change it.
+A Supernote plugin that fills a box you have drawn with a dot grid, crosses,
+ruled lines, squares or a to-do list. **`pluginID 5urw59jo9zji8rbh`** — never
+change it.
 
 **This project is a fork of [Tables](https://github.com/Sparkinman/tables-supernote-plugin)**,
 and everything below the SDK facts heading was learned there, on an A5X2
@@ -11,7 +12,8 @@ What was dropped in the fork: table detection, the diff, the mutation layer and
 everything that existed because a table had to be recognised again after the
 note was closed. A pattern is drawn once and never read back.
 
-Current build **1.0.0** (versionCode 6) — the **first public release**. A few
+Current build **1.1.0** (versionCode 7) — **added the to-do pattern**; see
+below. A few
 hundred KB of pure JavaScript, no native code, **no log and no probe suite**:
 `DIAGNOSTICS` is false in `src/flags.ts` and `add(DiagnosticsLogPackage())` is
 commented out in `MainApplication.kt`. Nothing is written to
@@ -20,11 +22,11 @@ commented out in `MainApplication.kt`. Nothing is written to
 The probe source is still here, behind the flag, because it is where every
 measured fact in this file came from and the next question will need it. Two
 edits turn it back on; both are needed, and the second is also what the build
-script scans to decide there is native code at all. **34 tests**; `tsc` and
+script scans to decide there is native code at all. **40 tests**; `tsc` and
 `eslint` clean.
 
 Run on both panels — an A6X2 repeatedly through development, and an A5X2 on
-1.0.0. Every mark lands at every size tried, the drawing estimate on screen is
+1.0.0 and again on 1.1.0. Every mark lands at every size tried, the drawing estimate on screen is
 accurate to within half a second, and the sizes and tones are what a
 photographed ladder says the panel can distinguish.
 
@@ -32,6 +34,49 @@ photographed ladder says the panel can distinguish.
 something needs measuring there — the 38ms a mark especially, since the batch
 behaved differently between the two panels in the table plugin — cut a
 diagnostics build rather than assuming this one's numbers carry over.
+
+## Added to-do — 1.1.0
+
+A fifth pattern: ruled lines with an empty box at the left of each, standing on
+its own rule. **Four ink strokes and a rule, and nothing else** — it was asked
+for as "just a box we can check off", there is no state anywhere and nothing to
+tap. It is ticked with the pen like paper, which also means it survives being
+copied, exported or written on exactly as the other patterns do.
+
+Three decisions in `layoutGrid`, and the reasons they are not arbitrary:
+
+**The box is six tenths of the row, capped at 8mm.** The box stands on its rule
+and reaches up into the writing space of the row above it, so its height comes
+out of the spacing and what is left over *is* the gap. This was the first thing
+asked of the feature — a box that touches the rule above reads as a table cell,
+not a checkbox — so four tenths of clear paper is a property the pattern has to
+keep, and `__tests__/layout.test.ts` asserts it is positive at every spacing on
+the stepper. The cap exists because the ratio alone stops making sense at the
+top of the range: at 20mm spacing six tenths is a twelve-millimetre box, which
+is not a checkbox. **If the cap is ever raised, the gap is what gets eaten** —
+which is why the test walks the whole ladder rather than one spacing.
+
+**The topmost lattice position is not a row.** Every other pattern draws at
+every position on its axis. This one starts at `ys.slice(1)`, because a box
+needs a clear spacing above its rule and the first position has only whatever
+the centring left there — which can be nothing, since `latticeAxes` splits the
+remainder and the remainder can be zero. The alternatives were a box hanging
+outside the region or a first line conspicuously without one. Dropping the row
+costs at most one row and every row drawn is complete.
+
+**The horizontal lattice is not used at all.** `xs` is a spacing chosen for
+rows; where the box goes is set by the left edge of the region and by how big a
+box the row can hold. So a checklist, like `lines`, only needs two positions on
+the vertical axis to be drawable, and it gains a check `lines` does not need: a
+region narrower than three box widths is refused, because what would come out
+is a column of boxes with stubs attached rather than anything to write in.
+
+Cost is five marks a row. At 8mm over a full A6X2 page that is about 18 rows,
+90 marks, three and a half seconds — in the same cheap bracket as `lines` and
+`squares`, and nowhere near the time cap.
+
+The picker now holds five chips, which overran the panel width on an A6X2, so
+`styles.seg` wraps. A second row of chips is better than a clipped one.
 
 ## What is different from Tables
 

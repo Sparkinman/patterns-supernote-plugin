@@ -1,13 +1,13 @@
 # Patterns
 
 A Supernote plugin that fills a box you have drawn with a pattern: a dot grid,
-crosses, ruled lines, or squares.
+crosses, ruled lines, squares, or a to-do list.
 
 Draw a rough rectangle, lasso it, tap **Patterns**, and choose the spacing in
 millimetres, how big the marks are and how dark. Or place one from the sidebar
 on an empty page.
 
-> **Status: working, tested on both panels.** 34 unit tests, plus an on-device
+> **Status: working, tested on both panels.** 40 unit tests, plus an on-device
 > probe suite run on an A5X2 (Manta) and an A6X2 (Nomad). Every mark lands, the
 > drawing time shown on screen is accurate to within half a second, and the
 > mark sizes and tones are what a photographed ladder says the panel can
@@ -18,7 +18,13 @@ on an empty page.
 
 ## What it does
 
-- **Four patterns** — dots, crosses, ruled lines for writing on, or squares.
+- **Five patterns** — dots, crosses, ruled lines for writing on, squares, or
+  a to-do list.
+- **To-do**, added in 1.1.0 — ruled lines, each with an empty box at the left
+  standing on its own rule. Four ink strokes and a rule; there is nothing to
+  tap, you tick it with the pen like paper. The box is six tenths of the row,
+  so the other four tenths are always clear paper between it and the line
+  above. 8 or 10mm suits it.
 - **Spacing in millimetres**, from 2.5mm to 20mm. 5mm is what dot grid paper
   uses; 8mm suits writing.
 - **Three mark sizes** and **two tones** — black or grey. For a lighter grid
@@ -40,7 +46,7 @@ a 5mm grid is the same size in the hand whichever device drew it.
 using and no fill. What there is, measured on hardware, is that a stroke paints
 a round cap of half its own width past each end. So a dot here is a stroke one
 pixel long: the caps do the rest, and the result is a round blob whose diameter
-is just the pen width. One code path draws all three patterns.
+is just the pen width. One code path draws every pattern.
 
 **And there is no transparency.** `Geometry` has a `penColor` and nothing else
 — no alpha, no blend — and the panel has one ink. The firmware accepts exactly

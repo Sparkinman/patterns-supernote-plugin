@@ -66,7 +66,9 @@ import {
   TONES,
   TONE_ORDER,
   defaultStyle,
+  checkboxSideFor,
   mmToPx,
+  pxToMm,
   rectHeight,
   rectWidth,
 } from './src/grid/types';
@@ -104,6 +106,7 @@ const PATTERN_LABEL: Record<Pattern, string> = {
   crosses: 'Crosses',
   lines: 'Lines',
   squares: 'Squares',
+  checklist: 'To-do',
 };
 
 const SIZE_LABEL: Record<MarkSize, string> = {
@@ -528,7 +531,7 @@ function Choose({screen: chosen, h}: {screen: Extract<Screen, {kind: 'choose'}>;
    * leaving somebody to wait twenty seconds and work it out.
    */
   const cheaper = (() => {
-    if (chosen.style.pattern === 'squares' || chosen.style.pattern === 'lines') {
+    if (chosen.style.pattern !== 'dots' && chosen.style.pattern !== 'crosses') {
       return null;
     }
     const asSquares = markCount({...spec, style: {...spec.style, pattern: 'squares'}});
@@ -557,6 +560,11 @@ function Choose({screen: chosen, h}: {screen: Extract<Screen, {kind: 'choose'}>;
       {cheaper !== null && (
         <Text style={styles.note}>
           {`Squares over the same area would be ${cheaper.marks} mark${cheaper.marks === 1 ? '' : 's'} and about ${cheaper.seconds} second${cheaper.seconds === 1 ? '' : 's'}.`}
+        </Text>
+      )}
+      {chosen.style.pattern === 'checklist' && chosen.spacingMm < 8 && (
+        <Text style={styles.note}>
+          {`${chosen.spacingMm} mm rows leave about ${Math.round(pxToMm(checkboxSideFor(mmToPx(chosen.spacingMm))))} mm of box and not much to write in. 8 or 10 mm suits a to-do list.`}
         </Text>
       )}
       {!!chosen.note && <Text style={styles.pending}>{chosen.note}</Text>}
@@ -909,11 +917,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepMark: {fontSize: fs(30), color: '#000000'},
-  seg: {flexDirection: 'row', alignItems: 'stretch'},
+  // Wraps because there are five patterns now, and five chips at this width
+  // overrun the panel on an A6X2. A second row is better than a clipped one.
+  seg: {flexDirection: 'row', alignItems: 'stretch', flexWrap: 'wrap'},
   segItem: {
     borderWidth: 2,
     borderColor: '#000000',
     marginRight: sp(8),
+    marginBottom: sp(8),
     paddingVertical: sp(8),
     paddingHorizontal: sp(14),
     minWidth: sp(104),

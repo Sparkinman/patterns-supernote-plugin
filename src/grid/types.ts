@@ -98,10 +98,22 @@ export const pxToMm = (px: number): number => (px * MM_PER_INCH) / DPI;
  * one pattern with no vertical component at all, which is why it is the only
  * one that keeps its outermost rules: a row of horizontals cannot make a
  * frame, so there is no border to avoid. See `layoutGrid`.
+ *
+ * `checklist` is `lines` with a box at the left of each rule — a to-do list.
+ * It is the only pattern that is not a lattice: the horizontal positions are
+ * ignored entirely, because where the box goes is decided by the left edge of
+ * the region and the size of the box, not by a spacing that was chosen for
+ * rows.
  */
-export type Pattern = 'dots' | 'crosses' | 'lines' | 'squares';
+export type Pattern = 'dots' | 'crosses' | 'lines' | 'squares' | 'checklist';
 
-export const PATTERN_ORDER: Pattern[] = ['dots', 'crosses', 'lines', 'squares'];
+export const PATTERN_ORDER: Pattern[] = [
+  'dots',
+  'crosses',
+  'lines',
+  'squares',
+  'checklist',
+];
 
 /**
  * How big a mark is, in page pixels, before it becomes a `penWidth`.
@@ -127,6 +139,37 @@ export const MARK_SIZES = {
 export type MarkSize = keyof typeof MARK_SIZES;
 
 export const MARK_SIZE_ORDER: MarkSize[] = ['fine', 'medium', 'bold'];
+
+/**
+ * How big a checklist box is, relative to the row it sits in.
+ *
+ * The box stands on its rule and reaches up into the row above it, which is
+ * the writing space for that line — so its height has to come out of the
+ * spacing, and **what is left over is the gap between the box and the rule
+ * above**. Six tenths leaves four, which is a clear band of paper at every
+ * spacing offered rather than a box that grows until it touches.
+ *
+ * The cap is there because the ratio alone stops making sense at the top of
+ * the range: at 20mm spacing six tenths is a twelve-millimetre box, which is
+ * not a checkbox any more. Past 13mm of spacing the box stops growing and the
+ * gap takes the rest.
+ */
+export const CHECKBOX_RATIO = 0.6;
+export const CHECKBOX_MAX_MM = 8;
+
+/** The side of the checklist box for a given row spacing, in page pixels. */
+export const checkboxSideFor = (spacingPx: number): number =>
+  Math.max(1, Math.min(Math.round(spacingPx * CHECKBOX_RATIO), Math.round(mmToPx(CHECKBOX_MAX_MM))));
+
+/**
+ * The clear paper between the box and the rule above it, in page pixels.
+ *
+ * Exported so a test can assert it is positive at every spacing offered. A
+ * box that touches the line above it reads as a table cell rather than a
+ * checkbox, which was the first thing said about this pattern.
+ */
+export const checkboxGapFor = (spacingPx: number): number =>
+  spacingPx - checkboxSideFor(spacingPx);
 
 /** Spacings offered, in millimetres. 5mm is what dot grid paper uses. */
 export const SPACINGS_MM = [2.5, 3, 4, 5, 6, 7.5, 8, 10, 12.5, 15, 20] as const;

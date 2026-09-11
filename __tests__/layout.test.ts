@@ -13,7 +13,10 @@ import {safeAreaFor} from '../src/grid/tolerances';
 import {
   MARK_SIZES,
   MARK_SIZE_ORDER,
+  SPACINGS_MM,
   TONES,
+  checkboxGapFor,
+  checkboxSideFor,
   defaultStyle,
   mmToPx,
   penWidthForPx,
@@ -399,5 +402,79 @@ describe('the cap is a time budget, not a failure threshold', () => {
 
     expect(estimateSeconds(dots)).toBeGreaterThan(estimateSeconds(lines) * 10);
     expect(MS_PER_MARK).toBeGreaterThan(0);
+  });
+});
+
+describe('a checklist is a rule with a box to tick', () => {
+  const rect: RectPx = {left: 100, top: 100, right: 1000, bottom: 1000};
+  const spacing = mmToPx(8);
+  const rows = (s: GridSpec) => latticeAxes(s.rect, s.spacingPx).ys.length - 1;
+
+  it('draws five strokes a row and counts them without building them', () => {
+    const s = spec(rect, spacing, {pattern: 'checklist'});
+    const marks = layoutGrid(s);
+
+    expect(marks).toHaveLength(rows(s) * 5);
+    expect(markCount(s)).toBe(marks.length);
+  });
+
+  /*
+   * The whole point of the pattern, and the first thing asked of it: the box
+   * stands on its own rule and must not reach the rule above. Asserted at
+   * every spacing offered, because the box size is a ratio with a cap and it
+   * is the cap that could close the gap if the cap were ever raised.
+   */
+  it('leaves clear paper between a box and the rule above it', () => {
+    for (const mm of SPACINGS_MM) {
+      const px = mmToPx(mm);
+      expect(checkboxGapFor(px)).toBeGreaterThan(0);
+      expect(checkboxSideFor(px)).toBeLessThan(px);
+
+      const s = spec(rect, px, {pattern: 'checklist'});
+      const marks = layoutGrid(s);
+      const ys = latticeAxes(rect, px).ys;
+      for (let i = 1; i < ys.length; i += 1) {
+        const box = marks.slice((i - 1) * 5, i * 5);
+        const topOfBox = Math.min(...box.flatMap(m => [m.p1.y, m.p2.y]));
+        expect(topOfBox).toBeGreaterThan(ys[i - 1]);
+      }
+    }
+  });
+
+  it('puts the rule beside the box rather than through it', () => {
+    const s = spec(rect, spacing, {pattern: 'checklist'});
+    const [, , , , rule] = layoutGrid(s);
+    const side = checkboxSideFor(spacing);
+
+    expect(rule.p1.y).toBe(rule.p2.y);
+    expect(rule.p1.x).toBeGreaterThan(rect.left + side);
+    expect(rule.p2.x).toBeLessThanOrEqual(rect.right);
+  });
+
+  /*
+   * The top lattice position is not a row: it has only whatever the centring
+   * left above it, which can be nothing, so a box drawn there would fall out
+   * of the region.
+   */
+  it('starts one row down, so every box has room above its rule', () => {
+    const s = spec(rect, spacing, {pattern: 'checklist'});
+    const marks = layoutGrid(s);
+
+    expect(Math.min(...marks.map(m => Math.min(m.p1.y, m.p2.y)))).toBeGreaterThanOrEqual(rect.top);
+    expect(Math.max(...marks.map(m => Math.max(m.p1.x, m.p2.x)))).toBeLessThanOrEqual(rect.right);
+  });
+
+  it('refuses a box too narrow to write in', () => {
+    const narrow = fitGrid(spec({left: 0, top: 0, right: 60, bottom: 900}, spacing, {pattern: 'checklist'}));
+
+    expect(narrow.ok).toBe(false);
+    expect(narrow.ok === false && narrow.reason).toMatch(/narrow/);
+  });
+
+  it('is cheap, like the other ruled patterns', () => {
+    const page = safeAreaFor(MANTA);
+    const dots = markCount(spec(page, mmToPx(5)));
+
+    expect(markCount(spec(page, mmToPx(8), {pattern: 'checklist'}))).toBeLessThan(dots / 4);
   });
 });

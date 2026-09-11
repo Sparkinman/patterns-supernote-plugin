@@ -1,6 +1,7 @@
 import {
   MARK_SIZES,
   PX_PER_PEN_WIDTH,
+  checkboxSideFor,
   penWidthForPx,
   rectHeight,
   rectWidth,
@@ -127,6 +128,10 @@ export function markCount(spec: GridSpec): number {
       // Ruled lines, not marks per point: this is the cheap one by a long way.
       // The outermost line on each axis is skipped — see `layoutGrid`.
       return Math.max(0, xs.length - 2) + Math.max(0, ys.length - 2);
+    case 'checklist':
+      // Five strokes a row: four sides of the box, and the rule. The top
+      // lattice position is not a row — see `layoutGrid`.
+      return Math.max(0, ys.length - 1) * 5;
   }
 }
 
@@ -176,6 +181,46 @@ export function layoutGrid(spec: GridSpec): RenderedLine[] {
         penColor,
         penType,
       });
+    }
+    return out;
+  }
+
+  if (pattern === 'checklist') {
+    /*
+     * A to-do list: a rule to write on, and a box to tick at the left of it.
+     *
+     * **The topmost lattice position is not a row.** Every box stands on its
+     * own rule and reaches upward into the row's writing space, so a rule
+     * needs a clear spacing above it before it can carry one — and the first
+     * position has only whatever the centring happened to leave, which can be
+     * nothing at all. Drawing a rule there would either put a box outside the
+     * region or leave one line conspicuously without a box. Dropping it costs
+     * a row at most, and every row that is drawn is complete.
+     *
+     * That is also why the horizontal lattice is not used here. `xs` is a
+     * spacing chosen for rows; where the box goes is set by the left edge and
+     * by how big a box the row can hold.
+     */
+    const {left, right, top} = spec.rect;
+    const side = checkboxSideFor(spec.spacingPx);
+    // A clear channel between the box and the rule it sits on, so the two do
+    // not read as one shape. A third of the box, and never less than the
+    // stroke is thick.
+    const gutter = Math.max(cap * 2, Math.round(side / 3));
+
+    for (const y of ys.slice(1)) {
+      const boxTop = Math.max(top, y - side);
+      const boxRight = left + side;
+      // The horizontals are drawn short by a cap at each end and the verticals
+      // likewise, so the four painted strokes meet exactly at the corners
+      // instead of overhanging them. The same correction the rules get.
+      out.push({p1: {x: left + cap, y: boxTop}, p2: {x: boxRight - cap, y: boxTop}, penWidth, penColor, penType});
+      out.push({p1: {x: left + cap, y}, p2: {x: boxRight - cap, y}, penWidth, penColor, penType});
+      out.push({p1: {x: left, y: boxTop + cap}, p2: {x: left, y: y - cap}, penWidth, penColor, penType});
+      out.push({p1: {x: boxRight, y: boxTop + cap}, p2: {x: boxRight, y: y - cap}, penWidth, penColor, penType});
+      // The rule picks up after the gutter and runs to the edge, so the box
+      // and the line share a baseline without touching.
+      out.push({p1: {x: boxRight + gutter, y}, p2: {x: right - cap, y}, penWidth, penColor, penType});
     }
     return out;
   }
@@ -259,12 +304,30 @@ export function fitGrid(spec: GridSpec): FitResult {
   // Squares need three positions across to yield one interior rule, because
   // the outermost line on each axis is deliberately not drawn.
   const needed = spec.style.pattern === 'squares' ? 3 : 2;
-  // Ruled lines only care about the vertical axis: a tall narrow box is a
-  // perfectly good thing to rule, however few lattice columns fit across it.
-  if (spec.style.pattern === 'lines' ? ys.length < 2 : xs.length < needed || ys.length < needed) {
+  // Ruled lines and checklists only care about the vertical axis: a tall
+  // narrow box is a perfectly good thing to rule, however few lattice columns
+  // fit across it. A checklist needs two positions to yield one row, because
+  // the topmost one is not a row.
+  const rowsOnly = spec.style.pattern === 'lines' || spec.style.pattern === 'checklist';
+  if (rowsOnly ? ys.length < 2 : xs.length < needed || ys.length < needed) {
     return {
       ok: false,
       reason: 'That spacing is too wide for the box. Choose a smaller spacing, or draw a bigger box.',
+      marks,
+    };
+  }
+  /*
+   * A checklist needs room for the box and a line worth writing on beside it.
+   * Below about three box widths what comes out is a column of boxes with a
+   * stub attached, which is not what anybody drew the region for.
+   */
+  if (
+    spec.style.pattern === 'checklist' &&
+    rectWidth(spec.rect) < checkboxSideFor(spec.spacingPx) * 3
+  ) {
+    return {
+      ok: false,
+      reason: 'That box is too narrow for a checklist. Draw a wider box, or choose a smaller spacing.',
       marks,
     };
   }
