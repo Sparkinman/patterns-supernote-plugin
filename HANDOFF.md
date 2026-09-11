@@ -11,10 +11,10 @@ What was dropped in the fork: table detection, the diff, the mutation layer and
 everything that existed because a table had to be recognised again after the
 note was closed. A pattern is drawn once and never read back.
 
-Current build **0.2.0** (versionCode 2), a **diagnostics build**:
+Current build **0.3.0** (versionCode 3), a **diagnostics build**:
 `DIAGNOSTICS = true` in `src/flags.ts` and `add(DiagnosticsLogPackage())`
 uncommented in `MainApplication.kt`, writing `Document/Patterns/log.txt`, with a
-**Probes** button in the panel header. **29 tests**; `tsc` and `eslint` clean.
+**Probes** button in the panel header. **34 tests**; `tsc` and `eslint` clean.
 
 Run on a Nomad once: it draws, and the two faults found were both about the ends of the size and tone ranges. See below.
 
@@ -28,7 +28,54 @@ Run on a Nomad once: it draws, and the two faults found were both about the ends
 | Spacing | Millimetres. Both panels are 300dpi in element space, so a millimetre is the same number of pixels on each. `src/grid/types.ts` is the one place that would have to learn about a panel that is not. |
 | Squares | **Interior rules only.** Drawing a rule at every lattice position puts one along each edge, and four of those are a frame. Ruled paper has no frame. |
 | Lines | Horizontal rules only, and **all** of them, including the outermost. The opposite of squares, because horizontals alone cannot make a frame. |
-| `MAX_MARKS` | 4000, and **a guess**. A 5mm grid over a page is ~500 elements against a table's 8–30, and nothing has asked this firmware for that many at once. Probe 7 is what sets this number properly. |
+| `MAX_MARKS` | Derived from `MAX_DRAW_SECONDS` and the measured 42ms a mark. Nothing is dropped at any size tried; the limit is how long somebody will watch a panel that appears to be doing nothing. |
+
+## Probe 7, and the two things it settled — 0.3.0
+
+The suite ran clean on a Nomad. Probe 7 answered the question the plugin was
+built around, and answered it differently from the way it was framed.
+
+**Nothing is dropped.** 120 marks, 120 landed. 460 marks, 460 landed. The host
+stayed bound, the grid was even, no corner missing. `batchUpdatePageElements`
+takes hundreds of elements without complaint.
+
+**The limit is time.** 5,697ms for 120 and 18,935ms for 460 — 47ms and 41ms a
+mark, so the cost is per element and very nearly linear. `MAX_MARKS` was 4,000,
+which at that rate is **two minutes fifty of a panel apparently doing nothing**.
+Nobody waits that out; they decide it has hung and start tapping. So the cap is
+derived from a time budget now rather than guessed, and the number of marks and
+the estimated seconds are both on the screen before you press Draw it and in the
+busy message while it draws.
+
+**And the 42ms was the bridge, not the drawing.** `insertLines` awaited one
+`createElement` per mark before sending any of them — 460 marks meant 460
+sequential crossings of the JS/native boundary followed by a single insert. The
+elements are built in chunks of `BUILD_CONCURRENCY` now, and `insertLines` logs
+the two phases separately so the split is visible. **Untested**: probe 7 races
+1, 16 and 64 against each other and counts what lands each way. A short count
+at higher concurrency is the result, not a mishap — it would mean
+`createElement` is not re-entrant and the chunk has to shrink.
+
+`MAX_DRAW_SECONDS` is 60 so that a 5mm dot grid over a whole A5X2 page — 1,160
+marks, the most ordinary request there is — is not refused. **If concurrency
+halves the per-mark cost, `MS_PER_MARK` and the budget should both come down.**
+
+## Two corrections to recorded facts, from the same run
+
+**`penWidth` loss is a scaling artefact, not a panel.** This file has said that
+penWidth round-trips exactly on a Manta and comes back light on a Nomad. The
+truth is better than that: on a Nomad, in a notebook *created on the Nomad*,
+`sent 300, read back 300` and the ladder lost `[0,0,0,0,0]`. The earlier Nomad
+runs were all in `table.note`, whose own page is 1920x2560 while the panel
+shows 1404x1872 — so everything was being scaled, and the rounding fell out of
+that. Same panel, same build, different notebook, different answer.
+
+**`getPageSize` and `getPageDisplaySize` agree when the note is native.** Both
+report 1404x1872 for a notebook made on the Nomad. They disagreed before for
+the same reason: `table.note` is a 1920-space note being displayed at 1404.
+
+Neither changes anything here — this plugin never reads a width back — but both
+were recorded as facts about *devices* and they are facts about *notebooks*.
 
 ## What the first hardware run said — 0.2.0
 

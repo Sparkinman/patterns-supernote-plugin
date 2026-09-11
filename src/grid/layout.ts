@@ -24,18 +24,46 @@ import type {GridSpec, Pt, RectPx, RenderedLine} from './types';
  */
 
 /**
+ * How long one mark takes to draw, in milliseconds.
+ *
+ * Measured on an A6X2, in one batch call: 120 marks in 5,697ms and 460 in
+ * 18,935ms. That is 47ms and 41ms each, so the cost is per element and very
+ * nearly linear — the batch is not doing anything clever, and there is nothing
+ * to optimise from this side.
+ */
+export const MS_PER_MARK = 42;
+
+/**
+ * The longest anybody should be asked to watch a panel not respond.
+ *
+ * Set so that the most ordinary request there is — a 5mm dot grid over a whole
+ * page — fits on the larger panel too. That is 1,160 marks on an A5X2, or
+ * about 49 seconds at the speed measured before the elements were built
+ * concurrently. Refusing the obvious thing would be worse than the wait.
+ *
+ * This wants revisiting once probe 7 has reported what concurrency did to the
+ * per-mark cost: if it halves, so should the number of seconds.
+ */
+export const MAX_DRAW_SECONDS = 60;
+
+/**
  * The most marks that will be drawn in one go.
  *
- * A grid is not a table. A table is eight to thirty lines; a 5mm grid over a
- * full A6X2 page is about five hundred dots, and crosses are two strokes each.
- * Every one is a separate element on the page, which the device has to store,
- * repaint and let the eraser hit individually.
+ * **The limit is time, not failure.** Probe 7 asked for 460 marks and got 460
+ * — nothing was dropped, the host stayed bound, the grid was even. It simply
+ * took nineteen seconds. At 42ms each the old cap of 4,000 would have been
+ * *two minutes and fifty seconds* of a panel apparently doing nothing, which
+ * nobody would wait out; they would decide it had hung and start tapping.
  *
- * This is a guess and it is meant to be raised or lowered once somebody has
- * watched a big one land. What it must not do is quietly let somebody ask for
- * fifty thousand.
+ * So the cap comes from the time budget above rather than from anything the
+ * firmware refuses. A 5mm dot grid over a whole A6X2 page is about 560 marks,
+ * or twenty-four seconds, and stays inside it.
  */
-export const MAX_MARKS = 4000;
+export const MAX_MARKS = Math.round((MAX_DRAW_SECONDS * 1000) / MS_PER_MARK);
+
+/** Roughly how long a given number of marks will take, in seconds. */
+export const estimateSeconds = (marks: number): number =>
+  Math.max(1, Math.round((marks * MS_PER_MARK) / 1000));
 
 /** The positions of the lattice, left to right and top to bottom. */
 export function latticePoints(rect: RectPx, spacingPx: number): Pt[] {
@@ -237,7 +265,10 @@ export function fitGrid(spec: GridSpec): FitResult {
   if (marks > MAX_MARKS) {
     return {
       ok: false,
-      reason: `That would be ${marks.toLocaleString()} marks, which is more than this will draw at once. Use a wider spacing, or a smaller box.`,
+      reason:
+        `That would be ${marks.toLocaleString()} marks and take about ` +
+        `${Math.round(estimateSeconds(marks) / 60)} minute${estimateSeconds(marks) >= 90 ? 's' : ''}. ` +
+        'Use a wider spacing, a smaller box, or lines or squares — they need far fewer marks.',
       marks,
     };
   }

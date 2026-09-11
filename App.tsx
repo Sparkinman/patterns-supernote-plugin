@@ -56,7 +56,7 @@ import {clearLog, flush, json, log, logPath, logStatus, readLog, section} from '
 import {ensureFileAccess} from './src/permissions';
 import {describe} from './src/sdk';
 import {inferRectFromInk, snapRect} from './src/grid/ink';
-import {fitGrid, layoutGrid, markCount} from './src/grid/layout';
+import {estimateSeconds, fitGrid, layoutGrid, markCount} from './src/grid/layout';
 import {safeAreaFor} from './src/grid/tolerances';
 import {
   MARK_SIZE_ORDER,
@@ -308,8 +308,13 @@ function App(): React.JSX.Element {
         return;
       }
 
+      /*
+       * The wait is named up front. 42ms a mark is measured, so a few hundred
+       * of them is twenty seconds of a panel apparently doing nothing — and a
+       * panel apparently doing nothing is one somebody starts tapping.
+       */
       void withPage(
-        `Drawing ${fit.marks.toLocaleString()} marks`,
+        `Drawing ${fit.marks.toLocaleString()} marks — about ${estimateSeconds(fit.marks)} seconds`,
         async ctx => {
           const marks = layoutGrid(fit.spec);
           const before = await countElements(ctx.filePath, ctx.page);
@@ -526,7 +531,8 @@ function Choose({screen: chosen, h}: {screen: Extract<Screen, {kind: 'choose'}>;
 
       <GridPreview spec={spec} pageSize={chosen.pageSize} />
       <Text style={styles.note}>
-        {`${Math.round(rectWidth(chosen.rect))} × ${Math.round(rectHeight(chosen.rect))} px, about ${marks.toLocaleString()} mark${marks === 1 ? '' : 's'}.`}
+        {`${Math.round(rectWidth(chosen.rect))} × ${Math.round(rectHeight(chosen.rect))} px, about ${marks.toLocaleString()} mark${marks === 1 ? '' : 's'}` +
+          (fit.ok ? `, ${estimateSeconds(marks)} seconds to draw.` : '.')}
       </Text>
       {!!chosen.note && <Text style={styles.pending}>{chosen.note}</Text>}
       {fit.ok === false && !chosen.note && <Text style={styles.pending}>{fit.reason}</Text>}

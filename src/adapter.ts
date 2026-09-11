@@ -146,6 +146,50 @@ export type InsertRoute = 'batch' | 'one-at-a-time' | 'failed';
  * refuses. Which route was used is logged, because the difference matters when
  * reading a later failure.
  */
+/**
+ * How many elements are allocated at once.
+ *
+ * `createElement` is a round trip across the bridge, and `insertLines` used to
+ * await one per mark before sending any of them. For a table that is thirty
+ * round trips and nobody notices; for a 460-dot grid it is 460, and probe 7
+ * measured the whole operation at 42ms a mark — which is bridge latency, not
+ * drawing.
+ *
+ * So they are allocated in chunks, with the chunk in flight together. Chunked
+ * rather than all at once deliberately: `createElement` allocates natively and
+ * registers accessors behind the element's uuid, and firing a thousand of
+ * those simultaneously at a module whose re-entrancy nobody has tested is a
+ * worse idea than firing sixteen. Probe 7 times 1, 16 and 64 against each
+ * other and counts what lands each time, which is what this number should be
+ * set from.
+ */
+export const BUILD_CONCURRENCY = 16;
+
+/**
+ * Turn lines into elements the host will accept, several at a time.
+ *
+ * Returns them in the order they were given, because the insert order is the
+ * draw order and a pattern drawn out of order is still the same pattern — but
+ * a diff that ever needs to match them up would care, and it costs nothing.
+ */
+export async function buildElements(
+  lines: readonly RenderedLine[],
+  page: number,
+  concurrency: number = BUILD_CONCURRENCY,
+): Promise<object[]> {
+  const width = Math.max(1, Math.floor(concurrency));
+  const out: object[] = [];
+  for (let i = 0; i < lines.length; i += width) {
+    const chunk = lines.slice(i, i + width);
+    out.push(
+      ...(await Promise.all(
+        chunk.map(line => createdGeometryElement(line, page, WRITE_LAYER)),
+      )),
+    );
+  }
+  return out;
+}
+
 export async function insertLines(
   lines: readonly RenderedLine[],
   page: number,
@@ -157,10 +201,17 @@ export async function insertLines(
   }
 
   try {
-    const elements: object[] = [];
-    for (const line of lines) {
-      elements.push(await createdGeometryElement(line, page, WRITE_LAYER));
-    }
+    /*
+     * Timed in two halves, because they are two different costs and only one
+     * of them is the device drawing anything. Allocating the elements is
+     * bridge latency; the insert is the host doing the work. Until probe 7
+     * split them nobody knew which was the 42ms.
+     */
+    const startedBuild = Date.now();
+    const elements = await buildElements(lines, page);
+    const built = Date.now() - startedBuild;
+    const startedInsert = Date.now();
+
     // Deleting and inserting in the same call is the one route measured to
     // work and to leave the host bound. Anything to be removed travels here.
     const res =
@@ -173,6 +224,10 @@ export async function insertLines(
           )
         : await PluginCommAPI.insertPageElements(elements, page, WRITE_LAYER);
     if ((res as {success?: boolean} | null)?.success === true) {
+      log(
+        `${lines.length} element(s): ${built}ms to build, ` +
+          `${Date.now() - startedInsert}ms to insert`,
+      );
       return 'batch';
     }
     log(`the batch was refused: ${JSON.stringify(res)} — falling back`);

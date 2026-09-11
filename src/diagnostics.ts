@@ -4,6 +4,7 @@ import {PluginCommAPI, PluginFileAPI, PluginManager, PluginNoteAPI} from 'sn-plu
 import {flush, json, log, logPath, result, section} from './log';
 import {
   PATTERN_LAYER_NAME,
+  buildElements,
   commitAndRepaint,
   createdGeometryElement,
   deleteViaFile,
@@ -382,12 +383,12 @@ const penLadder: Probe = {
       penWidthForPx(MARK_SIZES.fine),
       penWidthForPx(MARK_SIZES.medium),
       penWidthForPx(MARK_SIZES.bold),
-      900,
       1600,
+      2400,
     ];
     const legend =
-      'the three mark sizes this plugin offers - fine, medium, bold - then 900 ' +
-      'and 1600, which are past anything it draws, to see where the panel stops ' +
+      'the three mark sizes this plugin offers - fine, medium, bold - then 1600 ' +
+      'and 2400, which are past anything it draws, to see where the panel stops ' +
       'telling one weight from the next. A dot is a one-pixel stub at these ' +
       'widths, so a line at each width is what a dot of that size is made of.';
     const spacing = Math.round((r.bottom - r.top) / (widths.length + 1));
@@ -447,7 +448,7 @@ const geometry: Probe = {
   title: '8. Page geometry, and where the safe area is',
   writes: true,
   async run() {
-    section('12. Page geometry and the safe area');
+    section('8. Page geometry and the safe area');
     const ctx = await context();
     if (noNoteOpen(ctx)) {
       return;
@@ -658,7 +659,7 @@ const layers: Probe = {
     // The whole arrangement rests on this: draw on a layer of its own, and
     // still be able to find it again by switching to that layer to look.
     const drawn = await withPatternLayer(ctx.filePath, ctx.page, async layerNum => {
-      json('layer selected for the table', layerNum);
+      json('layer selected for the pattern', layerNum);
       const route = await insertLines([hLine(y, r, 300)], ctx.page, layerNum);
       json('insert route', route);
       // Save without reloading: reloadFile puts the current layer back to the
@@ -674,7 +675,7 @@ const layers: Probe = {
     json('what happened inside the switch', drawn);
 
     result(
-      'a line drawn on the Tables layer can be read back from it',
+      'a line drawn on the Patterns layer can be read back from it',
       drawn.found > 0 ? 'PASS' : 'FAIL',
       drawn.found > 0
         ? `read back from layer ${drawn.layerOf}`
@@ -699,7 +700,7 @@ const layers: Probe = {
       seg => Math.abs(seg.p1.y - y) <= 2,
     );
     result(
-      'the table is out of reach from the writing layer',
+      'the pattern is out of reach from the writing layer',
       fromMain.length === 0 ? 'PASS' : 'INFO',
       fromMain.length === 0
         ? 'lassoing handwriting cannot catch the rules'
@@ -763,7 +764,49 @@ const gridDraw: Probe = {
       return landed === marks.length;
     };
 
-    // The ordinary case first: 5mm dots, which is what dot grid paper uses.
+    /*
+     * How much of the time is the bridge, and how much is the device?
+     *
+     * `createElement` is a round trip per mark and they used to be awaited one
+     * at a time — 460 marks meant 460 sequential crossings before a single
+     * element was sent. This times the same grid built 1, 16 and 64 at a time
+     * and counts what lands each way, which is the only honest basis for
+     * picking `BUILD_CONCURRENCY`.
+     *
+     * A count that comes up short at higher concurrency is the answer, not a
+     * mishap: it would mean `createElement` is not re-entrant and the chunk
+     * has to stay small or go back to one.
+     */
+    const raceSpec: GridSpec = {
+      rect: band,
+      spacingPx: mmToPx(8),
+      style: {...defaultStyle(), penColor: TONES.black},
+    };
+    const raceMarks = layoutGrid(raceSpec);
+    for (const width of [1, 16, 64]) {
+      const before = (await readElements(ctx)).length;
+      const startedBuild = Date.now();
+      const elements = await buildElements(raceMarks, ctx.page, width);
+      const build = Date.now() - startedBuild;
+      const startedInsert = Date.now();
+      const res = await PluginCommAPI.insertPageElements(elements, ctx.page, null);
+      const insert = Date.now() - startedInsert;
+      await commitAndRepaint(ctx.filePath);
+      await save(ctx);
+      const landed = (await readElements(ctx)).length - before;
+      log(
+        `concurrency ${width}: ${raceMarks.length} marks, ${build}ms to build, ` +
+          `${insert}ms to insert, ${landed} landed` +
+          ((res as {success?: boolean} | null)?.success === true ? '' : ' (REFUSED)'),
+      );
+      result(
+        `concurrency ${width} — every mark landed`,
+        landed === raceMarks.length ? 'PASS' : 'FAIL',
+        `${landed} of ${raceMarks.length}`,
+      );
+    }
+
+    // The ordinary case: 5mm dots, which is what dot grid paper uses.
     const ok = await attempt('5mm dots', {
       rect: band,
       spacingPx: mmToPx(5),

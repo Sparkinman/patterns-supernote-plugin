@@ -1,5 +1,8 @@
 import {
+  MAX_DRAW_SECONDS,
   MAX_MARKS,
+  MS_PER_MARK,
+  estimateSeconds,
   fitGrid,
   latticeAxes,
   latticePoints,
@@ -334,5 +337,58 @@ describe('ruled lines, for writing on', () => {
     expect(markCount(spec(rect, 60, {pattern: 'lines'}))).toBeLessThan(
       markCount(spec(rect, 60, {pattern: 'dots'})),
     );
+  });
+});
+
+describe('the cap is a time budget, not a failure threshold', () => {
+  /*
+   * Probe 7 asked for 460 marks on an A6X2 and got 460 — nothing dropped, the
+   * host still bound, the grid even. It took 18,935ms. 120 marks took 5,697.
+   * So the cost is per element and very nearly linear, and the limit on how
+   * big a pattern may be is how long somebody will watch a panel that appears
+   * to be doing nothing.
+   */
+  it('matches what was measured on the panel', () => {
+    expect(estimateSeconds(120)).toBe(5);
+    expect(estimateSeconds(460)).toBe(19);
+  });
+
+  it('refuses at about a minute, not at three minutes', () => {
+    expect(estimateSeconds(MAX_MARKS)).toBeLessThanOrEqual(MAX_DRAW_SECONDS);
+    // The first cap of 4000 would have been the better part of three minutes.
+    expect(estimateSeconds(4000)).toBeGreaterThan(150);
+    expect(MAX_MARKS).toBeLessThan(4000);
+  });
+
+  /*
+   * The budget has to clear the most ordinary request there is, on both
+   * panels, or the cap is wrong rather than cautious. A 5mm dot grid over a
+   * whole A5X2 page is 1,160 marks.
+   */
+  it('still allows a 5mm dot grid over a whole page, on either panel', () => {
+    for (const page of [NOMAD, MANTA]) {
+      const result = fitGrid(spec(safeAreaFor(page), mmToPx(5)));
+
+      expect(result.ok).toBe(true);
+      expect(estimateSeconds(result.marks)).toBeLessThanOrEqual(MAX_DRAW_SECONDS);
+    }
+  });
+
+  it('says how long, when it says no', () => {
+    const result = fitGrid(spec(safeAreaFor(MANTA), mmToPx(2.5), {pattern: 'crosses'}));
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/minute/);
+    // And points at the two patterns that cost a fraction as much.
+    expect(result.ok === false && result.reason).toMatch(/lines or squares/);
+  });
+
+  it('is why lines and squares matter on a big area', () => {
+    const page = safeAreaFor(MANTA);
+    const dots = markCount(spec(page, mmToPx(5)));
+    const lines = markCount(spec(page, mmToPx(5), {pattern: 'lines'}));
+
+    expect(estimateSeconds(dots)).toBeGreaterThan(estimateSeconds(lines) * 10);
+    expect(MS_PER_MARK).toBeGreaterThan(0);
   });
 });
