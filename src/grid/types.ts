@@ -145,9 +145,9 @@ export const DEFAULT_SPACING_MM = 5;
  *
  * **Two, not three, and the third was cut on the evidence.** The firmware
  * takes exactly four values — 0x00, 0x9d, 0xc9 and white — which probe 9
- * settled: the batch route refuses anything else with 302, "Invalid color
- * value", and the `insertGeometry` fallback silently snaps it to the nearest
- * one instead. There is nothing between them to reach for.
+ * settled: the batch route refuses anything else outright with 302, "Invalid
+ * color value", and `insertGeometry` drops the invalid ones one at a time.
+ * Nothing between them renders, and nothing between them is even stored.
  *
  * 0xc9 was offered as `faint` and is simply too light to be useful: a grid you
  * cannot see is not a faint grid, it is a missing one. Offering it was

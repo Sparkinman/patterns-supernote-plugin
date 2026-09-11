@@ -208,11 +208,11 @@ describe('the three patterns', () => {
 
 describe('how dark the marks are', () => {
   /*
-   * Two, and the third was cut on the evidence. Probe 9 sent eight greys: the
-   * batch route refused anything outside the firmware's four with 302,
-   * "Invalid color value", and the insertGeometry fallback silently snapped
-   * instead. So there is no grey between 0x9d and 0xc9 to reach for, and 0xc9
-   * is too light to be a grid rather than a missing one.
+   * Two, and the third was cut on the evidence. Probe 9 sent eight greys and
+   * five were refused outright — by the batch route with 302, "Invalid color
+   * value", and by insertGeometry one element at a time. So there is no grey
+   * between 0x9d and 0xc9 to reach for, and 0xc9 is too light to be a grid
+   * rather than a missing one.
    */
   it('offers only the greys that are both accepted and useful', () => {
     expect(Object.values(TONES)).toEqual([0x00, 0x9d]);

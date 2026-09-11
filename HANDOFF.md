@@ -67,13 +67,31 @@ after all — they are just not enforced by `GeometrySchema`, which validates
 `penColor` as a plain integer. **The JS schema is not the authority; the host
 is.**
 
-**The `insertGeometry` fallback does not refuse. It snaps, silently.** Sent
-0x30 it stored 0x9d; sent 0x50 it stored 0xc9; then it stopped drawing
-altogether. Three of eight landed and nothing said which had been altered.
+**`insertGeometry` refuses too — one element at a time.** The five invalid
+greys were dropped; the three valid ones landed at exactly the values they
+were given.
 
-That second one is the dangerous one and it is now written down: **a route that
-accepts a value is not a route that honoured it.** The batch refusing is the
-better behaviour of the two.
+**That corrects what this file said a build ago**, and the wrong version was my
+own probe's fault rather than the firmware's. Probe 9 paired what was sent
+against what came back *by index*. When only three of eight land, `landed[1]`
+is not `sent[1]`, and the pairing invented a mapping out of two lines that had
+nothing to do with each other:
+
+```
+sent 0x30 -> read 0x9d      (nonsense)
+sent 0x50 -> read 0xc9      (nonsense)
+```
+
+It read exactly like silent snapping, which is a plausible enough firmware
+behaviour that I wrote it down as one. The probe matches on the y each line was
+asked to go to now, and the same page tells a duller story: `0x00 -> 0x00`,
+`0x9d -> 0x9d`, `0xc9 -> 0xc9`, all honoured, five refused.
+
+The lesson is an old one turned on itself: **a measurement is only as good as
+the instrument.** This is the third time a probe rather than the plugin has
+been the thing that was wrong — probe 8 broke its own subject by growing a
+table out of its own band, probe 7 drew without checking it had landed, and
+probe 9 fabricated a mapping. Read the probe before believing the finding.
 
 So there are three greys the firmware takes and **two the plugin offers**.
 0xc9 was `faint` and is simply too light to be useful — a grid you cannot see
@@ -225,7 +243,7 @@ in `~/.claude/skills/supernote-plugin-dev/SKILL.md`.
 | **A table drawn on one panel opens in the right place on the other.** Drawn on a Manta, the note opened on a Nomad: every edge, and the handwriting beside it, at 1404/1920 of where it was. Measured off the two screenshots — 0.732, 0.729, 0.731 against an expected 0.7312. | The firmware scales the whole page between the file's 1920×2560 and the panel's display space, so nothing here has to. It also means `SAFE_MARGIN`, being in display pixels, is the same *physical* inset on both — which is what it is for. |
 | **The batch insert is reliable on a Manta and not on a Nomad.** Every `insertPageElements` on a Nomad reports success and draws nothing the first time (`1 -> 1 element(s)`, five times in one session, and again inside probe 7). Not once on a Manta, in any run. | The count-and-retry in `createTable`, `commitEdit` and probe 7 is not belt and braces — on one of the two panels it is the only reason anything gets drawn. Do not add a write path without it. |
 | **`penColor` really is a palette of four**, enforced by the host rather than by the SDK. `insertPageElements` answers **302, "Invalid color value"** and rejects the whole batch; `GeometrySchema` validates it as a plain integer and lets anything through. | The JS schema is not the authority. Only 0x00, 0x9d, 0xc9 and 0xfe may be sent. |
-| **`insertGeometry` snaps an out-of-range `penColor` instead of refusing it.** Sent 0x30 it stored 0x9d; sent 0x50 it stored 0xc9, and said nothing. | A route that accepts a value is not a route that honoured it. Read back anything that matters, and prefer the route that refuses. |
+| **`insertGeometry` rejects an invalid `penColor` too**, one element at a time rather than failing the whole call. Nothing is snapped: what lands, lands at the value it was given. | An earlier version of this row claimed silent snapping. That was a bug in probe 9, not the firmware — see the 0.5.0 note. |
 | **`modifyLayers` puts the layer back in the file, not in the running note app.** The app keeps whatever layer it had selected until something makes it re-read. | The restore in `withTablesLayer` reloads afterwards. Without that it reported success — probe 6 reads the file back and passes — while the user was still on the Tables layer and their next stroke landed among the rules. |
 | **The first batch insert after the panel opens is often swallowed**, reporting success and drawing nothing: `1 -> 1 element(s)`, five times in one session, on blank pages and populated ones. A second attempt always lands. | Every path that writes has to check and retry — `createTable` does, `commitEdit`'s verification does, and probe 7 now does. Do not add a write path without one. |
 | **A blank page reports no elements** — page templates are not elements. | The detector does not have to exclude ruled paper. |
