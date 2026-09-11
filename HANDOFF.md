@@ -23,9 +23,15 @@ edits turn it back on; both are needed, and the second is also what the build
 script scans to decide there is native code at all. **34 tests**; `tsc` and
 `eslint` clean.
 
-Run repeatedly on a Nomad. Every mark lands at every size tried, the drawing
-estimate on screen is accurate to within half a second, and the sizes and tones
-are what a photographed ladder says the panel can distinguish.
+Run on both panels — an A6X2 repeatedly through development, and an A5X2 on
+1.0.0. Every mark lands at every size tried, the drawing estimate on screen is
+accurate to within half a second, and the sizes and tones are what a
+photographed ladder says the panel can distinguish.
+
+**The Manta has not been through the full probe suite**, only real use. If
+something needs measuring there — the 38ms a mark especially, since the batch
+behaved differently between the two panels in the table plugin — cut a
+diagnostics build rather than assuming this one's numbers carry over.
 
 ## What is different from Tables
 

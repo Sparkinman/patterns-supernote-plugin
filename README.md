@@ -7,10 +7,10 @@ Draw a rough rectangle, lasso it, tap **Patterns**, and choose the spacing in
 millimetres, how big the marks are and how dark. Or place one from the sidebar
 on an empty page.
 
-> **Status: working, tested on hardware.** 34 unit tests, plus an on-device
-> probe suite that has been run repeatedly on an A6X2 (Nomad). Every mark
-> lands, the drawing time on screen is accurate to within half a second, and
-> the mark sizes and tones are what a photographed ladder says the panel can
+> **Status: working, tested on both panels.** 34 unit tests, plus an on-device
+> probe suite run on an A5X2 (Manta) and an A6X2 (Nomad). Every mark lands, the
+> drawing time shown on screen is accurate to within half a second, and the
+> mark sizes and tones are what a photographed ladder says the panel can
 > actually tell apart.
 
 **[Download Patterns.snplg](../../releases/latest)** → copy it to the device →
