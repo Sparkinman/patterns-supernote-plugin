@@ -9,6 +9,7 @@ import {
 import {safeAreaFor} from '../src/grid/tolerances';
 import {
   MARK_SIZES,
+  MARK_SIZE_ORDER,
   TONES,
   defaultStyle,
   mmToPx,
@@ -173,11 +174,14 @@ describe('the three patterns', () => {
     // The lattice is centred, so there is a margin at each end. A rule that
     // stopped at the outermost dot would leave that margin blank and read as
     // an inset frame.
-    const marks = layoutGrid(spec({left: 0, top: 0, right: 205, bottom: 205}, 50, {pattern: 'squares'}));
+    const rect205 = {left: 0, top: 0, right: 205, bottom: 205};
+    const marks = layoutGrid(spec(rect205, 50, {pattern: 'squares'}));
     const horizontal = marks.find(m => m.p1.y === m.p2.y);
+    // Only the cap inset stands between the rule and the edge of the region.
+    const cap = Math.floor(pxForPenWidth(penWidthForPx(MARK_SIZES.medium)) / 2);
 
-    expect(horizontal?.p1.x).toBeLessThanOrEqual(2);
-    expect(horizontal?.p2.x).toBeGreaterThanOrEqual(203);
+    expect(horizontal?.p1.x).toBe(rect205.left + cap);
+    expect(horizontal?.p2.x).toBe(rect205.right - cap);
   });
 
   it('needs three positions across before a squares pattern has anything to draw', () => {
@@ -214,8 +218,15 @@ describe('how dark the marks are', () => {
     }
   });
 
-  it('starts faint, because a grid is something you write over', () => {
-    expect(defaultStyle().penColor).toBe(TONES.faint);
+  /*
+   * Both bad corners of the size-by-tone matrix have now been seen on a panel:
+   * fine and faint together is invisible, black and bold together is a row of
+   * fat blobs. Neither is worth removing — somebody wants each — but the
+   * setting you get without choosing must be neither.
+   */
+  it('starts in the middle of both controls, not in either corner', () => {
+    expect(defaultStyle().penColor).toBe(TONES.grey);
+    expect(defaultStyle().size).toBe('medium');
   });
 });
 
@@ -252,5 +263,76 @@ describe('refusing rather than quietly drawing something else', () => {
 
     expect(tooMany.marks).toBeGreaterThan(0);
     expect(fine.marks).toBeGreaterThan(0);
+  });
+});
+
+describe('the smallest mark has to actually be visible', () => {
+  /*
+   * Measured, not chosen. A ladder at penWidth 100, 200 and 300 — one, two and
+   * three pixels — came back as three identical hairlines on an A6X2, and a
+   * hairline in light grey is not there at all. The first version of this
+   * plugin put `fine` at 2px and it was reported as not showing, which is
+   * exactly what that measurement predicts.
+   */
+  it('keeps every size at or above the first reliably visible one', () => {
+    for (const size of MARK_SIZE_ORDER) {
+      expect(MARK_SIZES[size]).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('spans the measured range rather than bunching in the middle', () => {
+    // 1, 4 and 9 pixels were the steps the ladder showed as distinct. 4 and 9
+    // are the two ends of that which are also usable as a grid mark.
+    expect(MARK_SIZES.fine).toBe(4);
+    expect(MARK_SIZES.bold).toBe(9);
+    expect(MARK_SIZES.medium).toBeGreaterThan(MARK_SIZES.fine);
+    expect(MARK_SIZES.medium).toBeLessThan(MARK_SIZES.bold);
+  });
+});
+
+describe('ruled lines, for writing on', () => {
+  const rect = {left: 100, top: 100, right: 900, bottom: 500};
+
+  it('draws horizontals and nothing else', () => {
+    const marks = layoutGrid(spec(rect, 60, {pattern: 'lines'}));
+
+    expect(marks.length).toBeGreaterThan(0);
+    for (const m of marks) {
+      expect(m.p1.y).toBe(m.p2.y);
+      expect(m.p2.x).toBeGreaterThan(m.p1.x);
+    }
+  });
+
+  /*
+   * The opposite of what squares does, and deliberately. Squares skips its
+   * outermost rules because the four of them make a frame; a row of
+   * horizontals with no verticals cannot make a frame whatever you do with it,
+   * so every rule here is a line somebody can write on.
+   */
+  it('keeps its top and bottom rules, unlike squares', () => {
+    const {ys} = latticeAxes(rect, 60);
+    const lines = layoutGrid(spec(rect, 60, {pattern: 'lines'})).map(m => m.p1.y);
+    const squares = layoutGrid(spec(rect, 60, {pattern: 'squares'}))
+      .filter(m => m.p1.y === m.p2.y)
+      .map(m => m.p1.y);
+
+    expect(lines).toEqual(ys);
+    expect(squares).toEqual(ys.slice(1, -1));
+    expect(markCount(spec(rect, 60, {pattern: 'lines'}))).toBe(ys.length);
+  });
+
+  it('rules a box too narrow for a lattice across it', () => {
+    // A tall narrow column is a perfectly good thing to rule, however few
+    // lattice columns fit across it.
+    const narrow = {left: 100, top: 100, right: 140, bottom: 600};
+
+    expect(fitGrid(spec(narrow, 60, {pattern: 'lines'})).ok).toBe(true);
+    expect(fitGrid(spec(narrow, 60, {pattern: 'dots'})).ok).toBe(false);
+  });
+
+  it('is as cheap as squares, and far cheaper than dots', () => {
+    expect(markCount(spec(rect, 60, {pattern: 'lines'}))).toBeLessThan(
+      markCount(spec(rect, 60, {pattern: 'dots'})),
+    );
   });
 });

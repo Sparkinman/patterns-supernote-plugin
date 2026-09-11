@@ -11,12 +11,12 @@ What was dropped in the fork: table detection, the diff, the mutation layer and
 everything that existed because a table had to be recognised again after the
 note was closed. A pattern is drawn once and never read back.
 
-Current build **0.1.0** (versionCode 1), a **diagnostics build**:
+Current build **0.2.0** (versionCode 2), a **diagnostics build**:
 `DIAGNOSTICS = true` in `src/flags.ts` and `add(DiagnosticsLogPackage())`
 uncommented in `MainApplication.kt`, writing `Document/Patterns/log.txt`, with a
-**Probes** button in the panel header. **23 tests**; `tsc` and `eslint` clean.
+**Probes** button in the panel header. **29 tests**; `tsc` and `eslint` clean.
 
-**Not yet run on hardware.** That is the whole of what is open.
+Run on a Nomad once: it draws, and the two faults found were both about the ends of the size and tone ranges. See below.
 
 ## What is different from Tables
 
@@ -27,7 +27,45 @@ uncommented in `MainApplication.kt`, writing `Document/Patterns/log.txt`, with a
 | Tone | `penColor`, not opacity. There is no alpha in this SDK; the three tones are the three greys `GeometrySchema` accepts. A faint mark is light ink. |
 | Spacing | Millimetres. Both panels are 300dpi in element space, so a millimetre is the same number of pixels on each. `src/grid/types.ts` is the one place that would have to learn about a panel that is not. |
 | Squares | **Interior rules only.** Drawing a rule at every lattice position puts one along each edge, and four of those are a frame. Ruled paper has no frame. |
+| Lines | Horizontal rules only, and **all** of them, including the outermost. The opposite of squares, because horizontals alone cannot make a frame. |
 | `MAX_MARKS` | 4000, and **a guess**. A 5mm grid over a page is ~500 elements against a table's 8–30, and nothing has asked this firmware for that many at once. Probe 7 is what sets this number properly. |
+
+## What the first hardware run said — 0.2.0
+
+It drew. Twenty marks via the batch, `231 -> 251 element(s)`, first time and
+with no retry — on a Nomad, which for the table plugin swallowed the first
+insert of every session. Twenty is not five hundred, so probe 7 is still the
+question, but the path works.
+
+**Squares have no border**, confirmed in a photograph: the ruling runs to the
+edge of the region and stops.
+
+Two things were wrong and both were about the ends of the range:
+
+**`fine` at 2px did not show.** Predicted by a measurement already in this
+file, and not noticed: a ladder at penWidth 100, 200 and 300 — one, two and
+three pixels — came back as three identical hairlines on an A6X2. 2px is
+inside that dead zone, and a hairline in light grey is not there at all.
+`MARK_SIZES` is now 4, 6 and 9. Four is the smallest size measured as
+reliably visible; nine is the next step the same ladder showed as distinct.
+
+**Six is a known risk.** The measured distinct steps were about 1, 4 and 9, so
+6 sits inside a gap the panel may not resolve and `medium` may look like
+`fine`. That was taken deliberately, over the alternatives of dropping to two
+sizes or making `bold` a 16px blob. It is the first thing to look for in a
+photograph of probe 4's ladder.
+
+**Black and bold together is too much**, and so is fine and faint. Those are
+the two bad corners of offering a size and a tone independently, and neither
+option is worth removing — somebody wants black dots and somebody wants a grid
+they can barely see. The default is now `grey` and `medium`, the middle of
+both controls, so the setting you get without choosing is in neither corner.
+
+**Lines.** Horizontal rules and nothing else, for writing on. It is the only
+pattern that keeps its outermost rules: squares skips its because the four of
+them make a frame, and a row of horizontals with no verticals cannot make a
+frame whatever you do with it, so every rule there is a line somebody can
+write on.
 
 ## The first thing to do on hardware
 

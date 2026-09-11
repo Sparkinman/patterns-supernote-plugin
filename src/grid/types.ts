@@ -91,23 +91,37 @@ export const MM_PER_INCH = 25.4;
 export const mmToPx = (mm: number): number => (mm * DPI) / MM_PER_INCH;
 export const pxToMm = (px: number): number => (px * MM_PER_INCH) / DPI;
 
-/** What gets drawn at each point of the lattice. */
-export type Pattern = 'dots' | 'crosses' | 'squares';
+/**
+ * What gets drawn at each point of the lattice.
+ *
+ * `lines` is horizontal rules only — ruled paper, for writing on. It is the
+ * one pattern with no vertical component at all, which is why it is the only
+ * one that keeps its outermost rules: a row of horizontals cannot make a
+ * frame, so there is no border to avoid. See `layoutGrid`.
+ */
+export type Pattern = 'dots' | 'crosses' | 'lines' | 'squares';
 
-export const PATTERN_ORDER: Pattern[] = ['dots', 'crosses', 'squares'];
+export const PATTERN_ORDER: Pattern[] = ['dots', 'crosses', 'lines', 'squares'];
 
 /**
  * How big a mark is, in page pixels, before it becomes a `penWidth`.
  *
- * Dot grid paper uses something around a third of a millimetre. These are
- * spread wider than that because a panel does not resolve small differences in
- * stroke weight — a ladder drawn at 100, 200 and 300 came back as three
- * identical hairlines, and only around 400 does it start to change.
+ * **Four is the floor, and it is measured.** A ladder drawn at penWidth 100,
+ * 200 and 300 — one, two and three pixels — came back as three identical
+ * hairlines on an A6X2, and a hairline in light grey is not there at all. The
+ * first version of this plugin put `fine` at 2px and it was reported as not
+ * showing, exactly as that measurement predicts.
+ *
+ * The steps the same ladder showed as genuinely distinct were about 1, 4 and
+ * 9 pixels. 4 and 9 are the two ends here. **6 sits between them and may not
+ * be distinguishable from 4** — that is a known risk, taken deliberately
+ * rather than either offering two sizes or making `bold` a 16px blob, and it
+ * is the first thing to look at in a photograph of probe 4's ladder.
  */
 export const MARK_SIZES = {
-  fine: 2,
-  medium: 4,
-  bold: 7,
+  fine: 4,
+  medium: 6,
+  bold: 9,
 } as const;
 
 export type MarkSize = keyof typeof MARK_SIZES;
@@ -157,9 +171,18 @@ export interface GridStyle {
 
 export function defaultStyle(): GridStyle {
   return {
-    // Faint by default: a dot grid is something you write on top of, and a
-    // page of hard black dots fights the handwriting it exists to guide.
-    penColor: TONES.faint,
+    /*
+     * Grey and medium: the middle of both controls, and deliberately not
+     * either corner.
+     *
+     * Offering a size and a tone independently means some combinations are
+     * bad, and both bad ones have now been seen on a panel: fine and faint
+     * together is invisible, black and bold together is a row of fat blobs
+     * that fights the handwriting it exists to guide. Neither is worth
+     * removing — somebody wants black dots, and somebody wants a grid they can
+     * barely see — but the setting you get without choosing should be neither.
+     */
+    penColor: TONES.grey,
     penType: PEN_TYPE.fineliner,
     pattern: 'dots',
     size: 'medium',

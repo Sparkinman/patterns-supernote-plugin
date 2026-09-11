@@ -1,7 +1,7 @@
 # Patterns
 
 A Supernote plugin that fills a box you have drawn with a pattern: a dot grid,
-crosses, or ruled squares.
+crosses, ruled lines, or squares.
 
 Draw a rough rectangle, lasso it, tap **Patterns**, and choose the spacing in
 millimetres, how big the marks are and how dark. Or place one from the sidebar
@@ -9,12 +9,12 @@ on an empty page.
 
 > **Status: early.** The geometry is unit-tested and the SDK groundwork is
 > inherited from [Tables](https://github.com/Sparkinman/tables-supernote-plugin),
-> which is tested on both panels — but this plugin itself has not yet been run
-> on hardware.
+> which is tested on both panels. This plugin has had one run on an A6X2: it
+> draws, and the mark sizes have been corrected once as a result.
 
 ## What it does
 
-- **Three patterns** — dots, crosses, or ruled squares.
+- **Four patterns** — dots, crosses, ruled lines for writing on, or squares.
 - **Spacing in millimetres**, from 2.5mm to 20mm. 5mm is what dot grid paper
   uses.
 - **Three mark sizes** and **three tones** — black, grey or faint. A faint grid

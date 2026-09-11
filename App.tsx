@@ -102,6 +102,7 @@ type Screen =
 const PATTERN_LABEL: Record<Pattern, string> = {
   dots: 'Dots',
   crosses: 'Crosses',
+  lines: 'Lines',
   squares: 'Squares',
 };
 
@@ -720,6 +721,17 @@ function GridPreview({spec, pageSize}: {spec: GridSpec; pageSize: Size}) {
         ? '#6b6b6b'
         : '#b4b4b4';
 
+  /*
+   * The mark size, exaggerated on purpose.
+   *
+   * The preview is about a seventh of page scale, so a 4px mark and a 9px one
+   * both come out under a pixel and the size control would appear to do
+   * nothing at all. What the picture has to convey is the ordering and the
+   * fact that each step is real, not a faithful millimetre. Same reasoning as
+   * the tone swatches above, which are not the panel's greys either.
+   */
+  const weight = {fine: 1, medium: 2, bold: 3}[spec.style.size];
+
   return (
     <View style={[styles.preview, {width: W, height: H}]}>
       <View
@@ -740,8 +752,8 @@ function GridPreview({spec, pageSize}: {spec: GridSpec; pageSize: Size}) {
             position: 'absolute',
             left: toX(Math.min(m.p1.x, m.p2.x)),
             top: toY(Math.min(m.p1.y, m.p2.y)),
-            width: Math.max(1, toX(Math.abs(m.p2.x - m.p1.x))),
-            height: Math.max(1, toY(Math.abs(m.p2.y - m.p1.y))),
+            width: Math.max(weight, toX(Math.abs(m.p2.x - m.p1.x))),
+            height: Math.max(weight, toY(Math.abs(m.p2.y - m.p1.y))),
             backgroundColor: tone,
           }}
         />

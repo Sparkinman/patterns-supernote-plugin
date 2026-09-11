@@ -86,6 +86,9 @@ export function markCount(spec: GridSpec): number {
       return xs.length * ys.length;
     case 'crosses':
       return xs.length * ys.length * 2;
+    case 'lines':
+      // Horizontal rules only, and all of them — see `layoutGrid`.
+      return ys.length;
     case 'squares':
       // Ruled lines, not marks per point: this is the cheap one by a long way.
       // The outermost line on each axis is skipped — see `layoutGrid`.
@@ -117,6 +120,32 @@ export function layoutGrid(spec: GridSpec): RenderedLine[] {
   const penWidth = penWidthForPx(sizePx);
   const out: RenderedLine[] = [];
 
+  const cap = Math.floor((penWidth * PX_PER_PEN_WIDTH) / 2);
+
+  if (pattern === 'lines') {
+    /*
+     * Ruled paper: horizontal rules and nothing else, for writing on.
+     *
+     * **Every rule is drawn, including the top and bottom one**, which is the
+     * opposite of what `squares` does — and the difference is not an
+     * inconsistency. Squares skips its outermost rules because the four of
+     * them together make a frame around the region, and ruled paper has no
+     * frame. A row of horizontals with no verticals cannot make a frame
+     * whatever you do with it, so there is nothing to avoid, and every rule
+     * here is a line somebody can write on.
+     */
+    for (const y of ys) {
+      out.push({
+        p1: {x: spec.rect.left + cap, y},
+        p2: {x: spec.rect.right - cap, y},
+        penWidth,
+        penColor,
+        penType,
+      });
+    }
+    return out;
+  }
+
   if (pattern === 'squares') {
     /*
      * Interior rules only. **No border.**
@@ -133,7 +162,6 @@ export function layoutGrid(spec: GridSpec): RenderedLine[] {
      * the cap lands on the edge instead of past it. The same correction the
      * table plugin needed, for the same reason.
      */
-    const cap = Math.floor((penWidth * PX_PER_PEN_WIDTH) / 2);
     const {left, right, top, bottom} = spec.rect;
     for (const y of ys.slice(1, -1)) {
       out.push({p1: {x: left + cap, y}, p2: {x: right - cap, y}, penWidth, penColor, penType});
@@ -197,7 +225,9 @@ export function fitGrid(spec: GridSpec): FitResult {
   // Squares need three positions across to yield one interior rule, because
   // the outermost line on each axis is deliberately not drawn.
   const needed = spec.style.pattern === 'squares' ? 3 : 2;
-  if (xs.length < needed || ys.length < needed) {
+  // Ruled lines only care about the vertical axis: a tall narrow box is a
+  // perfectly good thing to rule, however few lattice columns fit across it.
+  if (spec.style.pattern === 'lines' ? ys.length < 2 : xs.length < needed || ys.length < needed) {
     return {
       ok: false,
       reason: 'That spacing is too wide for the box. Choose a smaller spacing, or draw a bigger box.',
