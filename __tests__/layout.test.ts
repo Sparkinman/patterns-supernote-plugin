@@ -1,0 +1,256 @@
+import {
+  MAX_MARKS,
+  fitGrid,
+  latticeAxes,
+  latticePoints,
+  layoutGrid,
+  markCount,
+} from '../src/grid/layout';
+import {safeAreaFor} from '../src/grid/tolerances';
+import {
+  MARK_SIZES,
+  TONES,
+  defaultStyle,
+  mmToPx,
+  penWidthForPx,
+  pxForPenWidth,
+  pxToMm,
+  toneOf,
+} from '../src/grid/types';
+import type {GridSpec, Pattern, RectPx} from '../src/grid/types';
+
+const NOMAD = {width: 1404, height: 1872};
+const MANTA = {width: 1920, height: 2560};
+
+const spec = (
+  rect: RectPx,
+  spacingPx: number,
+  over: Partial<GridSpec['style']> = {},
+): GridSpec => ({rect, spacingPx, style: {...defaultStyle(), ...over}});
+
+describe('millimetres, because that is what dot grid paper is sold in', () => {
+  it('converts at 300dpi', () => {
+    expect(Math.round(mmToPx(5))).toBe(59);
+    expect(Math.round(mmToPx(25.4))).toBe(300);
+    expect(pxToMm(mmToPx(7.5))).toBeCloseTo(7.5);
+  });
+
+  /*
+   * The reason the spacing is offered in millimetres at all. Both panels are
+   * 300dpi in the space elements are addressed in — an A5X2 is 1920x2560 over
+   * 10.7 inches, an A6X2 1404x1872 over 7.8 — so a millimetre is the same
+   * number of pixels on each, and a grid is the same size in the hand.
+   */
+  it('means the same thing on both panels', () => {
+    const fiveMm = mmToPx(5);
+    const nomad = safeAreaFor(NOMAD);
+    const manta = safeAreaFor(MANTA);
+
+    const across = (r: RectPx) => latticeAxes(r, fiveMm).xs.length;
+    // The Manta page is physically bigger, so it fits more dots — which is the
+    // point. What must not happen is the same box giving different answers.
+    expect(across(manta)).toBeGreaterThan(across(nomad));
+    expect(across({left: 0, top: 0, right: 590, bottom: 590})).toBe(
+      across({left: 100, top: 100, right: 690, bottom: 690}),
+    );
+  });
+});
+
+describe('a dot is a stroke with nowhere to go', () => {
+  /*
+   * The measured fact this rests on: a stroke paints a round cap of half its
+   * own width past each end, so a one-pixel stub at penWidth N is a round blob
+   * N/100 pixels across. There is no circle to draw and no fill to ask for.
+   */
+  it('turns a wanted size in pixels into the penWidth that paints it', () => {
+    for (const px of [2, 4, 7]) {
+      expect(pxForPenWidth(penWidthForPx(px))).toBe(px);
+    }
+  });
+
+  it('never asks for a pen the firmware would refuse', () => {
+    // GeometrySchema enforces penWidth >= 100, and a 1px mark is under it.
+    expect(penWidthForPx(1)).toBeGreaterThanOrEqual(100);
+    expect(penWidthForPx(0)).toBeGreaterThanOrEqual(100);
+  });
+
+  it('draws each dot as a one-pixel stub, not a zero-length one', () => {
+    const marks = layoutGrid(spec({left: 0, top: 0, right: 100, bottom: 100}, 50));
+
+    expect(marks).toHaveLength(9);
+    for (const m of marks) {
+      expect(m.p2.x - m.p1.x).toBe(1);
+      expect(m.p1.y).toBe(m.p2.y);
+      expect(m.penWidth).toBe(penWidthForPx(MARK_SIZES.medium));
+    }
+  });
+});
+
+describe('where the marks land', () => {
+  it('spaces them exactly, and centres the remainder', () => {
+    // 100 wide at 30 apart fits four points using 90, so 5 is left over and
+    // half of it goes on each side. A grid started at the corner would leave
+    // all 10 down one edge, which looks like a mistake.
+    const {xs} = latticeAxes({left: 0, top: 0, right: 100, bottom: 10}, 30);
+
+    expect(xs).toEqual([5, 35, 65, 95]);
+  });
+
+  it('is symmetric within the box', () => {
+    const rect = {left: 200, top: 300, right: 1000, bottom: 900};
+    const {xs, ys} = latticeAxes(rect, 70);
+
+    expect(xs[0] - rect.left).toBe(rect.right - xs[xs.length - 1]);
+    expect(ys[0] - rect.top).toBe(rect.bottom - ys[ys.length - 1]);
+  });
+
+  it('lays points out row by row', () => {
+    const pts = latticePoints({left: 0, top: 0, right: 10, bottom: 10}, 10);
+
+    expect(pts).toEqual([
+      {x: 0, y: 0},
+      {x: 10, y: 0},
+      {x: 0, y: 10},
+      {x: 10, y: 10},
+    ]);
+  });
+});
+
+describe('the three patterns', () => {
+  const rect = {left: 0, top: 0, right: 200, bottom: 200};
+
+  it('costs what it says it will, before drawing anything', () => {
+    for (const pattern of ['dots', 'crosses', 'squares'] as Pattern[]) {
+      const s = spec(rect, 50, {pattern});
+      expect(layoutGrid(s)).toHaveLength(markCount(s));
+    }
+  });
+
+  it('is one stroke per dot, two per cross', () => {
+    expect(markCount(spec(rect, 50, {pattern: 'dots'}))).toBe(25);
+    expect(markCount(spec(rect, 50, {pattern: 'crosses'}))).toBe(50);
+  });
+
+  /*
+   * Squares are ruled lines rather than a mark at every point, which makes
+   * them an order of magnitude cheaper than the other two: 25 dots and 6
+   * lines cover the same area.
+   */
+  it('is far cheaper as squares', () => {
+    // Five positions each way, first and last skipped: three rules each way.
+    expect(markCount(spec(rect, 50, {pattern: 'squares'}))).toBe(6);
+  });
+
+  it('keeps a cross inside its own cell', () => {
+    const marks = layoutGrid(spec(rect, 50, {pattern: 'crosses'}));
+    const arm = Math.max(...marks.map(m => Math.abs(m.p2.x - m.p1.x))) / 2;
+
+    expect(arm).toBeLessThan(50 / 2);
+  });
+
+  /*
+   * No border. Drawing a rule at every lattice position puts one along each
+   * edge, and four of those are a frame around the whole thing — which is not
+   * what ruled paper looks like. The ruling runs to the edge of the region and
+   * stops, without outlining it.
+   */
+  it('draws no border around a squares pattern', () => {
+    const marks = layoutGrid(spec(rect, 50, {pattern: 'squares'}));
+    const {xs, ys} = latticeAxes(rect, 50);
+
+    const horizontals = marks.filter(m => m.p1.y === m.p2.y).map(m => m.p1.y);
+    const verticals = marks.filter(m => m.p1.x === m.p2.x).map(m => m.p1.x);
+
+    expect(horizontals).not.toContain(ys[0]);
+    expect(horizontals).not.toContain(ys[ys.length - 1]);
+    expect(verticals).not.toContain(xs[0]);
+    expect(verticals).not.toContain(xs[xs.length - 1]);
+    expect(horizontals).toEqual(ys.slice(1, -1));
+    expect(verticals).toEqual(xs.slice(1, -1));
+  });
+
+  it('runs the ruling to the edge of the region rather than the lattice', () => {
+    // The lattice is centred, so there is a margin at each end. A rule that
+    // stopped at the outermost dot would leave that margin blank and read as
+    // an inset frame.
+    const marks = layoutGrid(spec({left: 0, top: 0, right: 205, bottom: 205}, 50, {pattern: 'squares'}));
+    const horizontal = marks.find(m => m.p1.y === m.p2.y);
+
+    expect(horizontal?.p1.x).toBeLessThanOrEqual(2);
+    expect(horizontal?.p2.x).toBeGreaterThanOrEqual(203);
+  });
+
+  it('needs three positions across before a squares pattern has anything to draw', () => {
+    // Two positions means both get skipped and nothing is left.
+    const result = fitGrid(spec({left: 0, top: 0, right: 100, bottom: 100}, 60, {pattern: 'squares'}));
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('pulls a square rule in by its own cap, so it does not overshoot', () => {
+    const marks = layoutGrid(spec(rect, 50, {pattern: 'squares', size: 'bold'}));
+    const horizontals = marks.filter(m => m.p1.y === m.p2.y);
+
+    expect(horizontals.length).toBeGreaterThan(0);
+    for (const m of horizontals) {
+      expect(m.p1.x).toBeGreaterThan(rect.left);
+      expect(m.p2.x).toBeLessThan(rect.right);
+    }
+  });
+});
+
+describe('how dark the marks are', () => {
+  it('offers three tones the firmware will actually accept', () => {
+    // GeometrySchema rejects any penColor that is not one of its four.
+    expect(Object.values(TONES)).toEqual([0x00, 0x9d, 0xc9]);
+  });
+
+  it('draws every mark in the tone that was asked for', () => {
+    for (const tone of [TONES.black, TONES.grey, TONES.faint]) {
+      const marks = layoutGrid(spec({left: 0, top: 0, right: 100, bottom: 100}, 25, {penColor: tone}));
+
+      expect(marks.every(m => m.penColor === tone)).toBe(true);
+      expect(toneOf(tone)).toBeDefined();
+    }
+  });
+
+  it('starts faint, because a grid is something you write over', () => {
+    expect(defaultStyle().penColor).toBe(TONES.faint);
+  });
+});
+
+describe('refusing rather than quietly drawing something else', () => {
+  it('will not draw a grid with fewer than two marks across', () => {
+    const result = fitGrid(spec({left: 0, top: 0, right: 40, bottom: 40}, 100));
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/too wide for the box/);
+  });
+
+  it('will not draw more marks than it is willing to', () => {
+    // A 5mm grid of crosses over a full Manta page is the sort of thing that
+    // gets asked for by accident.
+    const page = safeAreaFor(MANTA);
+    const result = fitGrid(spec(page, mmToPx(1), {pattern: 'crosses'}));
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.marks).toBeGreaterThan(MAX_MARKS);
+  });
+
+  it('allows a 5mm grid over a whole page, which is the ordinary case', () => {
+    for (const page of [NOMAD, MANTA]) {
+      const result = fitGrid(spec(safeAreaFor(page), mmToPx(5)));
+
+      expect(result.ok).toBe(true);
+      expect(result.ok === true && result.marks).toBeLessThan(MAX_MARKS);
+    }
+  });
+
+  it('says how many marks it would be either way', () => {
+    const tooMany = fitGrid(spec(safeAreaFor(MANTA), mmToPx(1), {pattern: 'crosses'}));
+    const fine = fitGrid(spec(safeAreaFor(MANTA), mmToPx(5)));
+
+    expect(tooMany.marks).toBeGreaterThan(0);
+    expect(fine.marks).toBeGreaterThan(0);
+  });
+});
